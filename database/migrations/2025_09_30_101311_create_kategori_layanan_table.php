@@ -15,7 +15,7 @@ return new class extends Migration
         if (!Schema::hasTable('kategori_layanan')) {
             Schema::create('kategori_layanan', function (Blueprint $table) {
                 $table->id('id_kategoriLayanan');
-                $table->foreignId('id_admin')->nullable()->constrained('admin')->onDelete('set null')->onUpdate('cascade');
+                $table->foreignId('id_admin')->nullable()->constrained('admin', 'id_admin')->onDelete('set null')->onUpdate('cascade');
                 $table->string('nama', 60);
                 $table->string('status', 35);
                 $table->text('keterangan')->nullable();

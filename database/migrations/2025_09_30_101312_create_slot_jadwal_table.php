@@ -14,8 +14,8 @@ return new class extends Migration
         if (!Schema::hasTable('slot_jadwal')) {
         Schema::create('slot_jadwal', function (Blueprint $table) {
             $table->id('id_slot');
-            $table->foreignId('id_admin')->nullable()->constrained('admin')->onDelete('set null')->onUpdate('cascade');
-            $table->foreignId('id_layanan')->nullable()->constrained('layanan')->onDelete('cascade')->onUpdate('cascade');
+            $table->foreignId('id_admin')->nullable()->constrained('admin', 'id_admin')->onDelete('set null')->onUpdate('cascade');
+            $table->foreignId('id_layanan')->nullable()->constrained('layanan', 'id_layanan')->onDelete('cascade')->onUpdate('cascade');
             $table->time('waktu');
             $table->string('status_slot', 25);
             $table->tinyInteger('is_default')->default(1);

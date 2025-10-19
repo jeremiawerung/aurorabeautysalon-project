@@ -14,7 +14,7 @@ return new class extends Migration
         if (!Schema::hasTable('metodepembayaran')) {
         Schema::create('metodepembayaran', function (Blueprint $table) {
             $table->id('id_metodePembayaran');
-            $table->foreignId('id_admin')->nullable()->constrained('admin')->onDelete('set null')->onUpdate('cascade');
+            $table->foreignId('id_admin')->nullable()->constrained('admin', 'id_admin')->onDelete('set null')->onUpdate('cascade');
             $table->string('nama', 60);
             $table->string('status', 35);
             $table->text('keterangan')->nullable();

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('nomor_telepon', 15);
             $table->string('email', 65)->unique();
             $table->string('password');
-            $table->date('tanggal_daftar')->default(\DB::raw('CURRENT_DATE')); // default untuk tanggal daftar
+            $table->date('tanggal_daftar')->default(now()->toDateString()); // default untuk tanggal daftar
             $table->string('status_pelanggan', 35);
             $table->timestamps();
         });
