@@ -96,8 +96,8 @@
                     </li>
                 </ul>
                 <div class="d-flex">
-                    <!-- Tombol Logout yang mengarah ke route admin.logout -->
-                    <form action="{{ route('admin.logout') }}" method="POST" class="d-inline">
+                    <!-- Tombol Logout yang mengarah ke route logout terpadu -->
+                    <form action="{{ route('logout') }}" method="POST" class="d-inline">
                         @csrf
                         <button type="submit" class="btn logout-btn me-2">Logout</button>
                     </form>

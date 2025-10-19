@@ -15,12 +15,12 @@ class PelangganSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create customer in users table
+        // Create customer in users table (tanpa verifikasi untuk testing)
         $user = User::create([
             'name' => 'Maria Sari',
             'email' => 'maria.sari@gmail.com',
             'password' => Hash::make('password123'),
-            'email_verified_at' => now(),
+            'email_verified_at' => null, // Belum terverifikasi untuk testing
             'role' => 'pelanggan'
         ]);
 

@@ -25,19 +25,9 @@ class PelangganAuthController extends Controller
         // Validasi input
         $request->validate([
             'nama' => 'required|string|max:255',
-            'email' => 'required|email|unique:pelanggan,email',
-            'nomor_telepon' => 'required|numeric|digits_between:10,15|unique:pelanggan,nomor_telepon',
-            'password' => 'required|min:8|confirmed',  // Menyertakan konfirmasi password
-        ]);
-
-        // Membuat pelanggan baru setelah validasi
-        $pelanggan = Pelanggan::create([
-            'nama' => $request->nama,
-            'email' => $request->email,
-            'nomor_telepon' => $request->nomor_telepon,
-            'password' => Hash::make($request->password), // Mengenkripsi password
-            'status_pelanggan' => 'inactive', // Status pelanggan masih inactive setelah registrasi
-            'tanggal_daftar' => now(),
+            'email' => 'required|email|unique:users,email',
+            'nomor_telepon' => 'required|numeric|digits_between:10,15',
+            'password' => 'required|min:8|confirmed',
         ]);
 
         // Membuat pengguna baru untuk autentikasi (User)
@@ -48,44 +38,31 @@ class PelangganAuthController extends Controller
             'role' => 'pelanggan', // Set role sebagai pelanggan
         ]);
 
+        // Membuat pelanggan baru setelah validasi (untuk data detail)
+        $pelanggan = Pelanggan::create([
+            'nama' => $request->nama,
+            'email' => $request->email,
+            'nomor_telepon' => $request->nomor_telepon,
+            'password' => Hash::make($request->password),
+            'status_pelanggan' => 'aktif', // Langsung aktif untuk sekarang
+            'tanggal_daftar' => now(),
+        ]);
+
         // Men-trigger event registrasi (untuk mengirim email verifikasi)
         event(new Registered($user));
         
-        // Redirect ke halaman login setelah registrasi berhasil
-        return redirect()->route('login')->with('message', 'Pendaftaran berhasil! Cek email untuk verifikasi.');
+        // Login user setelah registrasi
+        Auth::login($user);
+        
+        // Redirect ke halaman verifikasi email
+        return redirect()->route('verification.notice')->with('message', 'Pendaftaran berhasil! Silakan cek email Anda untuk verifikasi.');
     }
 
-    // Menampilkan form login pelanggan
+    // Menampilkan form login pelanggan (tidak digunakan lagi, login terpadu di AuthController)
     public function showLoginForm()
     {
-        return view('auth.login');
-    }
-
-    // Proses login pelanggan
-    public function login(Request $request)
-    {
-        $credentials = $request->only('email', 'password');
-
-        if (Auth::guard('pelanggan')->attempt($credentials)) {
-            $pelanggan = Auth::guard('pelanggan')->user();
-
-            // Cek status pelanggan jika aktif
-            if ($pelanggan->status_pelanggan !== 'aktif') {
-                Auth::guard('pelanggan')->logout();
-                return back()->withErrors(['email' => 'Akun Anda tidak aktif.']);
-            }
-
-            // Redirect ke halaman index setelah login berhasil
-            return redirect()->route('pelanggan.index');
-        }
-
-        return back()->withErrors(['email' => 'Email atau password salah.']);
-    }
-
-    // Logout pelanggan
-    public function logout()
-    {
-        Auth::guard('pelanggan')->logout();
         return redirect()->route('login');
     }
+
+    // Login dan logout sudah ditangani di AuthController
 }

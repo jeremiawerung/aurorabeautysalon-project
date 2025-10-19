@@ -20,7 +20,7 @@ class AdminSeeder extends Seeder
             'name' => 'Admin Aurora',
             'email' => 'admin@aurorabeauty.com',
             'password' => Hash::make('password123'),
-            'email_verified_at' => now(),
+            'email_verified_at' => now(), // Admin langsung terverifikasi
             'role' => 'admin'
         ]);
 
