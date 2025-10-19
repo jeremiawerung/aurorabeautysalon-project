@@ -39,7 +39,7 @@
                 </label>
             </div>
 
-            <div class="flex items-center justify-between mt-6">
+                        <div class="flex items-center justify-between mt-6">
                 <div class="text-sm">
                     <a href="{{ route('register') }}" 
                        class="text-indigo-600 hover:text-indigo-500 underline">
@@ -53,10 +53,16 @@
             </div>
         </form>
 
-        <div class="mt-4 text-center">
-            <p class="text-xs text-gray-500">
-                Sistem akan otomatis mengarahkan Anda ke dashboard yang sesuai berdasarkan role akun.
+        <div class="mt-4 text-center space-y-2">
+            <p class="text-sm">
+                <a href="{{ route('password.request') }}" 
+                   class="text-indigo-600 hover:text-indigo-500 underline">
+                    Lupa Password?
+                </a>
             </p>
         </div>
+        </form>
+
+        
     </x-authentication-card>
 </x-guest-layout>

@@ -17,6 +17,7 @@ use App\Http\Controllers\DiskonController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PelangganAuthController;
 use App\Http\Controllers\EmailVerificationController;
+use App\Http\Controllers\ForgotPasswordController;
 
 // Halaman depan aplikasi
 Route::get('/', function () {
@@ -29,6 +30,12 @@ Route::middleware(['guest'])->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->name('login.post');
     Route::get('/register', [PelangganAuthController::class, 'showRegistrationForm'])->name('register');
     Route::post('/register', [PelangganAuthController::class, 'register'])->name('register.store');
+    
+    // Password reset routes
+    Route::get('/forgot-password', [App\Http\Controllers\ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
+    Route::post('/forgot-password', [App\Http\Controllers\ForgotPasswordController::class, 'sendResetLinkEmail'])->name('password.email');
+    Route::get('/reset-password/{token}', [App\Http\Controllers\ForgotPasswordController::class, 'showResetForm'])->name('password.reset');
+    Route::post('/reset-password', [App\Http\Controllers\ForgotPasswordController::class, 'reset'])->name('password.update');
 });
 
 // Email verification routes (tanpa middleware verified agar bisa diakses user yang belum verified)
