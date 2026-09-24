@@ -75,11 +75,16 @@ return new class extends Migration
         }
 
         // 4. Drop columns (Email & Password)
+        // Indexes referencing the column must be dropped first — MySQL does this
+        // implicitly when a column is dropped, but SQLite does not, so it's done
+        // explicitly here to keep this migration portable across drivers.
         Schema::table('admin', function (Blueprint $table) {
+            $table->dropUnique(['email']);
             $table->dropColumn(['email', 'password']);
         });
 
         Schema::table('pelanggan', function (Blueprint $table) {
+            $table->dropUnique(['email']);
             $table->dropColumn(['email', 'password']);
         });
     }
