@@ -485,8 +485,15 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlSearch = urlParams.get('search');
+    if (urlSearch) {
+        search.value = urlSearch;
+    }
+
     fetchData();
 });
+
 </script>
 
 @if (session('success'))

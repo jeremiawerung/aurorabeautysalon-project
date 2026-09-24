@@ -206,8 +206,14 @@
                         <div class="col-md-3">
                             <label for="durasi" class="form-label">Durasi <small class="text-muted">(Per Menit)</small></label>
                             <div class="input-group">
-                                <input type="number" id="durasi" name="durasi" class="form-control"
-                                       value="{{ old('durasi', $layanan->durasi) }}" style="border-right: 0;">
+                                <select id="durasi" name="durasi" class="form-control" style="border-right: 0;">
+                                    <option value="15" {{ old('durasi', $layanan->durasi) == 15 ? 'selected' : '' }}>15 Menit</option>
+                                    <option value="30" {{ old('durasi', $layanan->durasi) == 30 ? 'selected' : '' }}>30 Menit</option>
+                                    <option value="45" {{ old('durasi', $layanan->durasi) == 45 ? 'selected' : '' }}>45 Menit</option>
+                                    <option value="60" {{ old('durasi', $layanan->durasi) == 60 ? 'selected' : '' }}>60 Menit</option>
+                                    <option value="90" {{ old('durasi', $layanan->durasi) == 90 ? 'selected' : '' }}>90 Menit</option>
+                                    <option value="120" {{ old('durasi', $layanan->durasi) == 120 ? 'selected' : '' }}>120 Menit</option>
+                                </select>
                                 <span class="input-group-text" style="border-left: 0;">Menit</span>
                             </div>
                         </div>

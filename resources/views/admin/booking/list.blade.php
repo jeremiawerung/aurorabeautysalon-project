@@ -262,8 +262,16 @@ document.addEventListener("DOMContentLoaded", function() {
         drawTable();
     });
 
-    // Initial Load
+    // Initial Load: Check for URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlSearch = urlParams.get('search');
+    const urlStatus = urlParams.get('status');
+    
+    if (urlSearch) filterSearch.value = urlSearch;
+    if (urlStatus) filterStatus.value = urlStatus;
+
     loadData();
+
 
     // --- MODAL ACTION (Update Status) ---
     window.openUpdateStatusModal = function(id, currentStatus) {

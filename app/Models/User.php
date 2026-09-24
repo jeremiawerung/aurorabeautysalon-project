@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\QueuedVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -85,5 +86,17 @@ class User extends Authenticatable implements MustVerifyEmail
     public function getRoleAttribute()
     {
         return $this->attributes['role'] ?? 'pelanggan';  // Default role adalah pelanggan
+    }
+
+    /**
+     * Override notifikasi verifikasi email bawaan supaya dikirim lewat queue.
+     *
+     * Tanpa ini, notifikasi VerifyEmail default Laravel dikirim SINKRON (SMTP asli ke Gmail,
+     * lihat .env MAIL_MAILER=smtp) di tengah request registrasi, membuat halaman tergantung
+     * beberapa detik sebelum redirect. QueuedVerifyEmail identik tapi ShouldQueue.
+     */
+    public function sendEmailVerificationNotification()
+    {
+        $this->notify(new QueuedVerifyEmail);
     }
 }

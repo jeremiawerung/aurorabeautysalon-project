@@ -16,9 +16,13 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Midtrans\Config;
 use Midtrans\Snap;
+use App\Traits\AdminNotifiable;
+
 
 class PosController extends Controller
 {
+    use AdminNotifiable;
+
     public function index()
     {
         try {
@@ -210,11 +214,33 @@ class PosController extends Controller
 
             DB::commit();
 
+            // ===========================
+            // NOTIFIKASI ADMIN: BOOKING OFFLINE (POS)
+            // ===========================
+            try {
+                $firstReservasi = Reservasi::with('pelanggan')->find($reservasiIds[0] ?? null);
+                if ($firstReservasi) {
+                    $customerName = $firstReservasi->pelanggan->nama ?? 'Pelanggan';
+                    $tglBooking = $firstReservasi->tanggal_reservasi ? date('d/m/Y', strtotime($firstReservasi->tanggal_reservasi)) : '-';
+                    
+                    $this->notifyAdmins([
+                        'title'   => 'Booking Offline (POS)',
+                        'message' => "Admin mencatat booking untuk Pelanggan {$customerName} (Tgl: {$tglBooking}).",
+                        'type'    => 'info',
+                        'link'    => route('booking.list', ['search' => $firstReservasi->id_reservasi]),
+                        'icon'    => 'fas fa-store-alt',
+                    ]);
+                }
+            } catch (\Exception $eNotif) {
+                Log::error('Gagal kirim notif POS save: ' . $eNotif->getMessage());
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Booking berhasil dibuat.',
                 'reservasi_ids' => $reservasiIds,
             ]);
+
         } catch (Exception $e) {
             DB::rollBack();
             Log::error('PosController@save: '.$e->getMessage());
@@ -436,6 +462,11 @@ class PosController extends Controller
                         $amountToSave = (float) $existingPayment->jumlah;
                         $diskonToSave = (float) $existingPayment->diskon_applied;
 
+                        $totalPaidBeforeUpdate = (float) $reservasi->pembayaran()
+                            ->whereIn('status_pembayaran', ['bayar_lunas', 'bayar_dp'])
+                            ->where('id_pembayaran', '!=', $existingPayment->id_pembayaran)
+                            ->sum('jumlah');
+
                         $totalPaidAfterUpdate = $totalPaidBeforeUpdate + $amountToSave;
                         $totalDiskonAfterUpdate = $totalDiskonBefore + $diskonToSave;
 
@@ -550,6 +581,26 @@ class PosController extends Controller
                     'status_pembayaran' => $pembayaranStatus,
                     'order_id' => $order_id_per_reservasi,
                 ]);
+
+                // --- CART CLEANUP: Hapus reservasi PENDING lain yang menempati slot yang sama ---
+                try {
+                    $conflictingReservations = Reservasi::where('id_reservasi', '!=', $rid)
+                        ->where('tanggal_reservasi', $reservasi->tanggal_reservasi)
+                        ->where('waktu_reservasi', $reservasi->waktu_reservasi)
+                        ->where('status_reservasi', 'pending')
+                        ->whereDoesntHave('pembayaran')
+                        ->whereHas('layanan', function($q) use ($reservasi) {
+                            $q->whereIn('layanan.id_layanan', $reservasi->layanan->pluck('id_layanan'));
+                        })
+                        ->get();
+
+                    foreach ($conflictingReservations as $conRes) {
+                        $conRes->delete();
+                        Log::info("Cart cleanup (POS Midtrans): Reservasi #{$conRes->id_reservasi} dihapus karena slot telah dibayar oleh Reservasi #{$rid}");
+                    }
+                } catch (\Exception $eCleanup) {
+                    Log::error("Cart cleanup error (POS Midtrans) for ID {$rid}: " . $eCleanup->getMessage());
+                }
             }
 
             DB::commit();
@@ -788,14 +839,57 @@ class PosController extends Controller
                 if ($statusPembayaran === 'bayar_lunas') {
                     $reservasi->update(['status_reservasi' => 'pending']);
                 }
+
+                // --- CART CLEANUP: Hapus reservasi PENDING lain yang menempati slot yang sama ---
+                try {
+                    $conflictingReservations = Reservasi::where('id_reservasi', '!=', $rid)
+                        ->where('tanggal_reservasi', $reservasi->tanggal_reservasi)
+                        ->where('waktu_reservasi', $reservasi->waktu_reservasi)
+                        ->where('status_reservasi', 'pending')
+                        ->whereDoesntHave('pembayaran')
+                        ->whereHas('layanan', function($q) use ($reservasi) {
+                            $q->whereIn('layanan.id_layanan', $reservasi->layanan->pluck('id_layanan'));
+                        })
+                        ->get();
+
+                    foreach ($conflictingReservations as $conRes) {
+                        $conRes->delete();
+                        Log::info("Cart cleanup (POS Cash): Reservasi #{$conRes->id_reservasi} dihapus karena slot telah dibayar oleh Reservasi #{$rid}");
+                    }
+                } catch (\Exception $eCleanup) {
+                    Log::error("Cart cleanup error (POS Cash) for ID {$rid}: " . $eCleanup->getMessage());
+                }
             }
 
             DB::commit();
+
+            // ===========================
+            // NOTIFIKASI ADMIN: PEMBAYARAN KASIR (POS)
+            // ===========================
+            try {
+                $firstRid = $reservasiIds[0] ?? null;
+                $firstRes = Reservasi::with('pelanggan')->find($firstRid);
+                if ($firstRes) {
+                    $customerName = $firstRes->pelanggan->nama ?? 'Pelanggan';
+                    $tglBooking = $firstRes->tanggal_reservasi ? date('d/m/Y', strtotime($firstRes->tanggal_reservasi)) : '-';
+
+                    $this->notifyAdmins([
+                        'title'   => 'Pembayaran Kasir (POS)',
+                        'message' => "Pembayaran Pelanggan {$customerName} (Tgl: {$tglBooking}) telah diterima di kasir.",
+                        'type'    => 'success',
+                        'link'    => route('booking.list', ['search' => $firstRid]),
+                        'icon'    => 'fas fa-cash-register',
+                    ]);
+                }
+            } catch (\Exception $eNotif) {
+                Log::error('Gagal kirim notif POS payment: ' . $eNotif->getMessage());
+            }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Pembayaran berhasil diproses.',
             ]);
+
 
         } catch (Exception $e) {
             DB::rollBack();

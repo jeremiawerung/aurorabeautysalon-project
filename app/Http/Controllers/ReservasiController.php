@@ -7,9 +7,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use App\Traits\AdminNotifiable;
+
 
 class ReservasiController extends Controller
 {
+    use AdminNotifiable;
+
     public function booking()
     {
         return view('admin.booking');
@@ -746,8 +750,21 @@ class ReservasiController extends Controller
                 $reservasi->save();
             }
 
+            // ===========================
+            // NOTIFIKASI ADMIN: PEMBAYARAN MANUAL
+            // ===========================
+            $tglBooking = $reservasi->tanggal_reservasi ? $reservasi->tanggal_reservasi->format('d/m/Y') : '-';
+            $this->notifyAdmins([
+                'title'   => 'Pembayaran Manual Diterima',
+                'message' => "Pelanggan {$reservasi->pelanggan->nama} melunasi Reservasi tgl {$tglBooking} secara manual (Metode: {$request->metode}).",
+                'type'    => 'success',
+                'link'    => route('booking.list', ['search' => $id]),
+                'icon'    => 'fas fa-hand-holding-usd',
+            ]);
+
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Pembayaran manual berhasil dicatat.']);
+
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['success' => false, 'message' => 'Gagal menyimpan: ' . $e->getMessage()], 500);

@@ -3,6 +3,8 @@
 .env
 .env.backup
 .env.production
+.env.letest
+.env.*.local
 .phpactor.json
 .phpunit.result.cache
 /.fleet
@@ -22,3 +24,20 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Playwright E2E
+/e2e/.auth
+/e2e-report
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
+
+# Dokumentasi SDLC (internal, tidak untuk repo publik)
+/Dokumen_SDLC
+
+# Agent tooling config (generic, tidak spesifik ke project ini)
+/.agent
+
+# Showcase folder terpisah — isinya untuk repo Automation-testing-Aurora-Beauty-Salon-Web
+/portfolio-automation-testing

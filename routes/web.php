@@ -86,6 +86,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+    ->middleware('signed')
     ->name('verification.verify');
 
 // ------------------------------

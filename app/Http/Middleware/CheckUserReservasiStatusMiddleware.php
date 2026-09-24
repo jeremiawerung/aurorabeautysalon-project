@@ -192,8 +192,47 @@ class CheckUserReservasiStatusMiddleware
                             ]);
                     }
                 } catch (\Exception $e) {
-                    Log::warning('Error parsing reservasi (Pending->Selesai) #'.$reservasi->id_reservasi.': '.$e->getMessage());
+                    Log::warning('Error parsing reservasi (Pending->Selesai) #'.$reservasi->id_reservasi.' : '.$e->getMessage());
                     continue;
+                }
+            }
+
+            // ========================================
+            // 4. DELETE EXPIRED PENDING RESERVATIONS (CART)
+            // ========================================
+            // Kondisi:
+            // - status_reservasi = 'pending'
+            // - BELUM ada pembayaran
+            // - waktu sekarang > (tanggal_reservasi + waktu_reservasi + total_durasi)
+            
+            $expiredCarts = DB::table('reservasi as r')
+                ->join('reservasi_layanan as rl', 'r.id_reservasi', '=', 'rl.id_reservasi')
+                ->join('layanan as l', 'rl.id_layanan', '=', 'l.id_layanan')
+                ->where('r.id_pelanggan', $idPelanggan)
+                ->where('r.status_reservasi', 'pending')
+                ->whereNotExists(function ($query) {
+                    $query->select(DB::raw(1))
+                          ->from('pembayaran')
+                          ->whereColumn('pembayaran.id_reservasi', 'r.id_reservasi');
+                })
+                ->whereNotNull('r.tanggal_reservasi')
+                ->whereNotNull('r.waktu_reservasi')
+                ->select('r.id_reservasi', 'r.tanggal_reservasi', 'r.waktu_reservasi')
+                ->selectRaw('SUM(l.durasi) as total_durasi')
+                ->groupBy('r.id_reservasi', 'r.tanggal_reservasi', 'r.waktu_reservasi')
+                ->get();
+
+            foreach ($expiredCarts as $cart) {
+                try {
+                    $startDateTime = Carbon::parse($cart->tanggal_reservasi.' '.$cart->waktu_reservasi, $timezone);
+                    $endDateTime = $startDateTime->copy()->addMinutes($cart->total_durasi);
+
+                    if ($now->gt($endDateTime)) {
+                        DB::table('reservasi')->where('id_reservasi', $cart->id_reservasi)->delete();
+                        Log::info("Expired cart cleanup: Reservasi #{$cart->id_reservasi} dihapus karena sudah melewati waktu boking.");
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Error cleaning up expired cart #'.$cart->id_reservasi.': '.$e->getMessage());
                 }
             }
 

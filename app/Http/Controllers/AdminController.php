@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Auth\Events\Registered;
+
 
 class AdminController extends Controller
 {
@@ -71,6 +73,9 @@ class AdminController extends Controller
              'password' => Hash::make($request->password),
              'role' => 'admin',
         ]);
+
+        event(new Registered($user));
+
 
         // 2. Create Admin linked to User
         $admin = new Admin;

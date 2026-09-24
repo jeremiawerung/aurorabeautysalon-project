@@ -21,9 +21,13 @@ use Maatwebsite\Excel\Facades\Excel;
 use Midtrans\Config;
 use Midtrans\Notification;
 use Midtrans\Snap;
+use App\Traits\AdminNotifiable;
+
 
 class PembayaranController extends Controller
 {
+    use AdminNotifiable;
+
     public function __construct()
     {
         Carbon::setLocale('id');
@@ -200,6 +204,27 @@ class PembayaranController extends Controller
                 ],
             ]);
 
+            // ===========================
+            // NOTIFIKASI ADMIN: NEW BOOKING (SNAP GENERATED)
+            // ===========================
+            $firstReservasi = $reservasiModels->first();
+            $customerName = $firstReservasi->pelanggan->nama ?? 'Pelanggan';
+            $tglList = $reservasiModels->map(function($r) { 
+                return $r->tanggal_reservasi ? $r->tanggal_reservasi->format('d/m/Y') : '-'; 
+            })->unique()->implode(', ');
+
+            $this->notifyAdmins([
+                'title'   => 'Booking Baru (Checkout)',
+                'message' => "Pelanggan {$customerName} memesan (Tgl: {$tglList}). Menunggu Pembayaran: Rp " . number_format($totalGrossAmount, 0, ',', '.'),
+                'type'    => 'info',
+                'link'    => route('booking.list', ['search' => $orderId]),
+                'icon'    => 'fas fa-calendar-plus',
+            ]);
+
+
+            return $response;
+
+
         } catch (\Throwable $e) {
             Log::error('Midtrans proses error (Multi): '.$e->getMessage());
 
@@ -360,9 +385,50 @@ class PembayaranController extends Controller
                 ]);
 
                 $updatedReservasiIds[] = $rid;
+
+                // --- CART CLEANUP: Hapus reservasi PENDING lain yang menempati slot yang sama ---
+                try {
+                    // Cari reservasi lain (layanan sama, waktu sama, tgl sama) yang masih 'pending' dan BELUM bayar.
+                    $conflictingReservations = Reservasi::where('id_reservasi', '!=', $rid)
+                        ->where('tanggal_reservasi', $reservasi->tanggal_reservasi)
+                        ->where('waktu_reservasi', $reservasi->waktu_reservasi)
+                        ->where('status_reservasi', 'pending')
+                        ->whereDoesntHave('pembayaran')
+                        ->whereHas('layanan', function($q) use ($reservasi) {
+                            $q->whereIn('layanan.id_layanan', $reservasi->layanan->pluck('id_layanan'));
+                        })
+                        ->get();
+
+                    foreach ($conflictingReservations as $conRes) {
+                        $conRes->delete();
+                        Log::info("Cart cleanup: Reservasi #{$conRes->id_reservasi} dihapus karena slot telah dibayar oleh Reservasi #{$rid}");
+                    }
+                } catch (\Exception $eCleanup) {
+                    Log::error("Cart cleanup error for ID {$rid}: " . $eCleanup->getMessage());
+                    // Kita tidak melempar exception agar transaksi utama tetap jalan
+                }
             }
 
             DB::commit();
+
+            // ===========================
+            // NOTIFIKASI ADMIN: PEMBAYARAN BERHASIL (JS CALLBACK)
+            // ===========================
+            if ($midtransStatus === 'paid') {
+                $firstRid = $updatedReservasiIds[0] ?? null;
+                $reservasiObj = \App\Models\Reservasi::with('pelanggan')->find($firstRid);
+                $customerName = $reservasiObj->pelanggan->nama ?? 'Pelanggan';
+                $tglBooking = $reservasiObj->tanggal_reservasi ? $reservasiObj->tanggal_reservasi->format('d/m/Y') : '-';
+
+                $this->notifyAdmins([
+                    'title'   => 'Pembayaran Berhasil',
+                    'message' => "Pembayaran Pelanggan {$customerName} (Reservasi tgl {$tglBooking}) telah diterima.",
+                    'type'    => 'success',
+                    'link'    => route('booking.list', ['search' => $orderId]),
+                    'icon'    => 'fas fa-check-circle',
+                ]);
+
+            }
 
             return response()->json([
                 'success' => true,
@@ -370,6 +436,8 @@ class PembayaranController extends Controller
                 'status' => $midtransStatus,
                 'message' => 'Data pembayaran telah disimpan.',
             ]);
+
+
 
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -447,6 +515,11 @@ class PembayaranController extends Controller
                     $amountToSave = (float) $pembayaran->jumlah;
                     $diskonToSave = (float) $pembayaran->diskon_applied;
 
+                    $totalPaidBefore = (float) $reservasi->pembayaran()
+                        ->whereIn('status_pembayaran', ['bayar_lunas', 'bayar_dp'])
+                        ->where('id_pembayaran', '!=', $pembayaran->id_pembayaran)
+                        ->sum('jumlah');
+
                     $totalPaidCurrent = $totalPaidBefore + $amountToSave;
                     $totalDiskonCurrent = $totalDiskonBefore + $diskonToSave;
 
@@ -468,6 +541,26 @@ class PembayaranController extends Controller
                         $reservasi->update(['status_reservasi' => 'proses']);
                     }
 
+                    // --- CART CLEANUP: Hapus reservasi PENDING lain yang menempati slot yang sama ---
+                    try {
+                        $conflictingReservations = Reservasi::where('id_reservasi', '!=', $reservasi->id_reservasi)
+                            ->where('tanggal_reservasi', $reservasi->tanggal_reservasi)
+                            ->where('waktu_reservasi', $reservasi->waktu_reservasi)
+                            ->where('status_reservasi', 'pending')
+                            ->whereDoesntHave('pembayaran')
+                            ->whereHas('layanan', function($q) use ($reservasi) {
+                                $q->whereIn('layanan.id_layanan', $reservasi->layanan->pluck('id_layanan'));
+                            })
+                            ->get();
+
+                        foreach ($conflictingReservations as $conRes) {
+                            $conRes->delete();
+                            Log::info("Cart cleanup (Webhook): Reservasi #{$conRes->id_reservasi} dihapus karena slot telah dibayar oleh Reservasi #{$reservasi->id_reservasi}");
+                        }
+                    } catch (\Exception $eCleanup) {
+                        Log::error("Cart cleanup error (Webhook) for ID {$reservasi->id_reservasi}: " . $eCleanup->getMessage());
+                    }
+
                 } elseif ($midtransStatus === 'failed') {
                     $newPaymentStatus = 'failed';
                     $pembayaran->update(['status_pembayaran' => $newPaymentStatus]);
@@ -485,7 +578,27 @@ class PembayaranController extends Controller
 
             DB::commit();
 
+            // ===========================
+            // NOTIFIKASI ADMIN: PEMBAYARAN BERHASIL (WEBHOOK)
+            // ===========================
+            if ($midtransStatus === 'paid') {
+                $firstReservasi = $reservasi; // dari loop terakhir? Sebaiknya ambil satu saja
+                $customerName = $firstReservasi->pelanggan->nama ?? 'Pelanggan';
+                $tglBooking = $firstReservasi->tanggal_reservasi ? $firstReservasi->tanggal_reservasi->format('d/m/Y') : '-';
+
+                $this->notifyAdmins([
+                    'title'   => 'Pembayaran Berhasil (Webhook)',
+                    'message' => "Konfirmasi Pembayaran Pelanggan {$customerName} (Tgl: {$tglBooking}) telah diproses.",
+                    'type'    => 'success',
+                    'link'    => route('booking.list', ['search' => $orderId]),
+                    'icon'    => 'fas fa-check-circle',
+                ]);
+
+            }
+
+
             return response('OK', 200);
+
 
         } catch (\Throwable $e) {
             DB::rollBack();

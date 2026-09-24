@@ -94,41 +94,29 @@
                         </div>
 
                         {{-- Stats --}}
-                        <div class="row mt-3 pt-3" style="border-top: 1px dashed #d13a8a;">
-                            <div class="col-6 col-md-2 text-center mb-2 mb-md-0">
+                        <div class="row mt-3 pt-3 justify-content-evenly" style="border-top: 1px dashed #d13a8a;">
+                            <div class="col-6 col-md-3 text-center mb-2 mb-md-0">
                                 <div style="font-size: 13px; color: #888; margin-bottom: 4px;">Booking Hari Ini</div>
                                 <div style="font-size: 20px; font-weight: 800; color: #d13a8a;">
                                     {{ \App\Models\Reservasi::whereDate('tanggal_reservasi', today())->count() }}
                                 </div>
                             </div>
-                            <div class="col-6 col-md-2 text-center mb-2 mb-md-0">
+                            <div class="col-6 col-md-3 text-center mb-2 mb-md-0">
+                                <div style="font-size: 13px; color: #888; margin-bottom: 4px;">Booking Offline Hari Ini</div>
+                                <div style="font-size: 20px; font-weight: 800; color: #ff8c00;">
+                                    {{ \App\Models\Reservasi::whereDate('tanggal_reservasi', today())->where('catatan', 'like', '%BOOKING OFFLINE%')->count() }}
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3 text-center mb-2 mb-md-0">
                                 <div style="font-size: 13px; color: #888; margin-bottom: 4px;">Sudah Dibayar Lunas</div>
                                 <div style="font-size: 20px; font-weight: 800; color: #28a745;">
                                     {{ \App\Models\Pembayaran::where('status_pembayaran', 'bayar_lunas')->count() }}
                                 </div>
                             </div>
-                            <div class="col-6 col-md-2 text-center">
+                            <div class="col-6 col-md-3 text-center mb-2 mb-md-0">
                                 <div style="font-size: 13px; color: #888; margin-bottom: 4px;">Berlangsung</div>
                                 <div style="font-size: 20px; font-weight: 800; color: #17a2b8;">
                                     {{ \App\Models\Reservasi::where('status_reservasi', 'proses')->count() }}
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-2 text-center">
-                                <div style="font-size: 13px; color: #888; margin-bottom: 4px;">Selesai Bulan Ini</div>
-                                <div style="font-size: 20px; font-weight: 800; color: #6c757d;">
-                                    {{ \App\Models\Reservasi::where('status_reservasi', 'selesai')->whereMonth('created_at', now()->month)->count() }}
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-2 text-center">
-                                <div style="font-size: 13px; color: #888; margin-bottom: 4px;">Pembatalan Lunas</div>
-                                <div style="font-size: 20px; font-weight: 800; color: #6c757d;">
-                                    {{ \App\Models\Pembayaran::where('status_pembayaran', 'pembatalan_lunas')->whereMonth('created_at', now()->month)->count() }}
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-2 text-center">
-                                <div style="font-size: 13px; color: #888; margin-bottom: 4px;">Pembatalan DP</div>
-                                <div style="font-size: 20px; font-weight: 800; color: #6c757d;">
-                                    {{ \App\Models\Pembayaran::where('status_pembayaran', 'pembatalan_dp')->whereMonth('created_at', now()->month)->count() }}
                                 </div>
                             </div>
                         </div>

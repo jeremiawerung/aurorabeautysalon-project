@@ -56,6 +56,25 @@ class DashboardController extends Controller
             ->selectRaw('COALESCE(SUM(jumlah - COALESCE(diskon_applied,0)),0) AS total')
             ->value('total');
 
+        // --- 3 STAT TAMBAHAN ---
+        $layananNonAktif = (int) DB::table('layanan')
+            ->whereRaw('LOWER(status_layanan) = "non-aktif"')
+            ->count();
+
+        $menungguPembayaran = (int) DB::table('reservasi')
+            ->where('status_reservasi', 'pending')
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('pembayaran')
+                    ->whereColumn('pembayaran.id_reservasi', 'reservasi.id_reservasi')
+                    ->whereIn('pembayaran.status_pembayaran', ['bayar_lunas', 'bayar_dp']);
+            })
+            ->count();
+
+        $pelangganBaruBulanIni = (int) DB::table('pelanggan')
+            ->whereBetween('created_at', [$startMonth, $endDay])
+            ->count();
+
         $stats = [
             'total_pelanggan' => number_format($totalPelanggan, 0, ',', '.'),
             'total_transaksi' => number_format($totalTransaksi, 0, ',', '.'),
@@ -63,6 +82,9 @@ class DashboardController extends Controller
             'layanan_aktif' => number_format($layananAktif, 0, ',', '.'),
             'rerata_transaksi' => $shortIDR(max($rerataTransaksi, 0)),
             'pemasukan_bulan_ini' => $shortIDR(max($pemasukanBulanIni, 0)),
+            'layanan_nonaktif' => number_format($layananNonAktif, 0, ',', '.'),
+            'menunggu_pembayaran' => number_format($menungguPembayaran, 0, ',', '.'),
+            'pelanggan_baru_bulan_ini' => number_format($pelangganBaruBulanIni, 0, ',', '.'),
         ];
 
         $baseSelect = DB::table('reservasi as r')

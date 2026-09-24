@@ -174,7 +174,7 @@ class LayananController extends Controller
             'nama_layanan' => 'required|string|max:60',
             'harga' => 'required|numeric|min:0',
             'deskripsi' => 'nullable|string',
-            'durasi' => 'required|integer|min:1',
+            'durasi' => 'required|integer|in:15,30,45,60,90,120',
             'status_layanan' => 'required|string|in:aktif,non-aktif',
             'id_kategoriLayanan' => 'required|integer|exists:kategori_layanan,id_kategoriLayanan',
             'gambar' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',

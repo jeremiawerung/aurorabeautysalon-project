@@ -19,9 +19,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Traits\AdminNotifiable;
+
 
 class BookingController extends Controller
 {
+    use AdminNotifiable;
+
     /* =========================
         DATABASE / AUTH HELPERS
     ========================== */
@@ -430,7 +434,18 @@ class BookingController extends Controller
         // Perbaikan di sini: Tambahkan prefix 'reservasi.'
             ->where('reservasi.id_reservasi', '!=', $ignoreReservasiId)
 
-            ->whereIn('reservasi.status_reservasi', ['pending', 'sudah dibayar', 'proses'])
+            ->whereIn('reservasi.status_reservasi', ['sudah dibayar', 'proses'])
+            ->orWhere(function($q) use ($tanggal, $waktu_h_i_s, $ignoreReservasiId, $idLayanan) {
+                $q->where('reservasi.tanggal_reservasi', $tanggal)
+                  ->where('reservasi.waktu_reservasi', $waktu_h_i_s)
+                  ->where('reservasi.id_reservasi', '!=', $ignoreReservasiId)
+                  ->where('reservasi.status_reservasi', 'pending')
+                  ->whereExists(function ($query) {
+                      $query->select(DB::raw(1))
+                            ->from('pembayaran')
+                            ->whereColumn('pembayaran.id_reservasi', 'reservasi.id_reservasi');
+                  });
+            })
             ->where('reservasi_layanan.id_layanan', $idLayanan)
             ->lockForUpdate()
             ->count();
@@ -489,7 +504,17 @@ class BookingController extends Controller
             // 3. Ambil Semua Reservasi Aktif untuk Layanan ini (ID LAYANAN SAJA)
             $semuaReservasiAktif = DB::table('reservasi')
                 ->whereBetween('tanggal_reservasi', [$tanggalMulai, $tanggalSelesai])
-                ->whereIn('status_reservasi', ['pending', 'sudah dibayar', 'proses']) // Perluas status yang dianggap 'terisi'
+                ->where(function($q) {
+                    $q->whereIn('status_reservasi', ['sudah dibayar', 'proses'])
+                      ->orWhere(function($subq) {
+                          $subq->where('status_reservasi', 'pending')
+                               ->whereExists(function ($query) {
+                                   $query->select(DB::raw(1))
+                                         ->from('pembayaran')
+                                         ->whereColumn('pembayaran.id_reservasi', 'reservasi.id_reservasi');
+                               });
+                      });
+                })
                 ->join('reservasi_layanan', 'reservasi.id_reservasi', '=', 'reservasi_layanan.id_reservasi')
                 ->where('reservasi_layanan.id_layanan', $idLayanan) // Pengecekan Ketersediaan berdasarkan ID LAYANAN
                 ->join('reservasi_slot_jadwal', 'reservasi.id_reservasi', '=', 'reservasi_slot_jadwal.id_reservasi')
@@ -1050,13 +1075,17 @@ class BookingController extends Controller
         // ===========================
         // NOTIFIKASI ADMIN: NEW BOOKING
         // ===========================
+        $tglFormat = $reservasi->tanggal_reservasi ? $reservasi->tanggal_reservasi->format('d/m/Y') : '-';
+        $customerName = $reservasi->pelanggan->nama ?? 'Pelanggan';
+        
         $this->notifyAdmins([
             'title'   => 'Booking Baru Masuk',
-            'message' => "Reservasi #{$reservasi->id_reservasi} menunggu pembayaran. Total: Rp " . number_format($totalHarga, 0, ',', '.'),
+            'message' => "Pelanggan {$customerName} memesan untuk tgl {$tglFormat}. Status: Menunggu Pembayaran. Total: Rp " . number_format($totalHarga, 0, ',', '.'),
             'type'    => 'info',
-            'link'    => route('booking.index', ['search' => $reservasi->id_reservasi]), // Link ke admin booking
+            'link'    => route('booking.list', ['search' => $reservasi->id_reservasi]), // Link ke admin booking
             'icon'    => 'fas fa-calendar-plus',
         ]);
+
 
         // Redirect ke halaman sukses/tunggu pembayaran
         return redirect()
@@ -1626,13 +1655,17 @@ class BookingController extends Controller
         // ===========================
         // NOTIFIKASI ADMIN: CANCELLATION REQUEST
         // ===========================
+        $customerName = $reservasi->pelanggan->nama ?? 'Pelanggan';
+        $tglBooking = $reservasi->tanggal_reservasi ? $reservasi->tanggal_reservasi->format('d/m/Y') : '-';
+
         $this->notifyAdmins([
             'title'   => 'Permintaan Pembatalan',
-            'message' => "Pelanggan meminta pembatalan reservasi #{$reservasi->id_reservasi}.",
+            'message' => "{$customerName} meminta pembatalan reservasi (Tgl: {$tglBooking}).",
             'type'    => 'warning',
-            'link'    => route('admin.konfirmasi-pembatalan.index'), // Link ke menu pembatalan
+            'link'    => route('admin.konfirmasi-pembatalan.index', ['search' => $reservasi->id_reservasi]), // Link ke menu pembatalan
             'icon'    => 'fas fa-calendar-times',
         ]);
+
 
         // Mengubah back() menjadi respons JSON sukses
         return response()->json([
@@ -1689,23 +1722,5 @@ class BookingController extends Controller
             ], 500);
         }
     }
-    /**
-     * Helper untuk mengirim notifikasi ke semua admin
-     */
-    private function notifyAdmins($data)
-    {
-        try {
-            // Ambil semua user dengan role 'admin'
-            $admins = User::where('role', 'admin')->get();
 
-            foreach ($admins as $admin) {
-                // Pastikan admin notifiable
-                if(method_exists($admin, 'notify')) {
-                    $admin->notify(new AdminNotification($data));
-                }
-            }
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Gagal mengirim notifikasi admin: ' . $e->getMessage());
-        }
-    }
 }

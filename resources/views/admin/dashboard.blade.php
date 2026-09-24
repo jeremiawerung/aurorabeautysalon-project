@@ -105,6 +105,27 @@
                                 </div>
                             </div>
                         </div>
+                        {{-- Baris Stat Tambahan --}}
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-4 col-6">
+                                <div class="stat-card">
+                                    <div class="value">{{ $stats['layanan_nonaktif'] }}</div>
+                                    <div class="label">Layanan Non-aktif</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 col-6">
+                                <div class="stat-card">
+                                    <div class="value">{{ $stats['menunggu_pembayaran'] }}</div>
+                                    <div class="label">Menunggu Pembayaran</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 col-6">
+                                <div class="stat-card">
+                                    <div class="value">{{ $stats['pelanggan_baru_bulan_ini'] }}</div>
+                                    <div class="label">Pelanggan Baru (Bulan Ini)</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

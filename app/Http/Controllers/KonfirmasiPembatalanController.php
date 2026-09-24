@@ -8,9 +8,13 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Traits\AdminNotifiable;
+
 
 class KonfirmasiPembatalanController extends Controller
 {
+    use AdminNotifiable;
+
     /**
      * Display a listing of the resource.
      */
@@ -152,7 +156,23 @@ class KonfirmasiPembatalanController extends Controller
 
             DB::commit();
 
+            // ===========================
+            // NOTIFIKASI ADMIN: PEMBATALAN DISETUJUI
+            // ===========================
+            $customerName = $reservasi->pelanggan->nama ?? 'Pelanggan';
+            $tglBooking = $reservasi->tanggal_reservasi ? $reservasi->tanggal_reservasi->format('d/m/Y') : '-';
+
+            $this->notifyAdmins([
+                'title'   => 'Pembatalan Disetujui',
+                'message' => "Pembatalan reservasi {$customerName} (Tgl: {$tglBooking}) telah disetujui.",
+                'type'    => 'danger',
+                'link'    => route('booking.list', ['search' => $id]),
+                'icon'    => 'fas fa-user-times',
+            ]);
+
+
             Log::info("Pembatalan reservasi #{$id} disetujui. Status pembayaran: {$statusPembayaranSebelumnya} -> {$pembayaran->status_pembayaran}");
+
 
             return response()->json([
                 'success' => true,
@@ -188,6 +208,21 @@ class KonfirmasiPembatalanController extends Controller
             // Kembalikan ke status sebelumnya (proses)
             $reservasi->status_reservasi = 'pending';
             $reservasi->save();
+
+            // ===========================
+            // NOTIFIKASI ADMIN: PEMBATALAN DITOLAK
+            // ===========================
+            $customerName = $reservasi->pelanggan->nama ?? 'Pelanggan';
+            $tglBooking = $reservasi->tanggal_reservasi ? $reservasi->tanggal_reservasi->format('d/m/Y') : '-';
+
+            $this->notifyAdmins([
+                'title'   => 'Pembatalan Ditolak',
+                'message' => "Permintaan pembatalan {$customerName} (Tgl: {$tglBooking}) telah ditolak.",
+                'type'    => 'info',
+                'link'    => route('booking.list', ['search' => $id]),
+                'icon'    => 'fas fa-user-check',
+            ]);
+
 
             return response()->json([
                 'success' => true,

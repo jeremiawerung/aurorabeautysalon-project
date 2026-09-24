@@ -68,6 +68,16 @@ class EmailVerificationController extends Controller
              return redirect('/login')->with('error', 'Silakan login ulang.');
         }
 
+        // Validasi hash terhadap email user saat ini (persis seperti Illuminate\Foundation\Auth\EmailVerificationRequest).
+        // Middleware 'signed' pada route ini sudah menjamin URL (termasuk id & hash) belum
+        // diubah dan belum kedaluwarsa, tapi pengecekan hash tetap dipertahankan sebagai lapis
+        // kedua — mis. supaya link lama otomatis tidak valid lagi kalau email user berubah.
+        if (! hash_equals((string) $request->route('hash'), sha1($user->getEmailForVerification()))) {
+             \Illuminate\Support\Facades\Log::warning('EmailVerificationController: Hash tidak cocok.', ['user_id' => $user->id]);
+
+             return redirect('/login')->with('error', 'Link verifikasi tidak valid.');
+        }
+
         // 1. Check if already verified
         if ($user->hasVerifiedEmail()) {
             return redirect($this->redirectPath())->with('verified', 'Email Anda sudah diverifikasi sebelumnya.');
