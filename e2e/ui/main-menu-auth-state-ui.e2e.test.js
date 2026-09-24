@@ -117,7 +117,9 @@ test.describe('Main Menu - state pelanggan login', () => {
 
     await menu.panelBookingHistoryLink.click();
 
-    await expect(page).toHaveURL(new RegExp(`${ROUTES.bookingHistory}$`));
+    // Page now defaults to a status filter (?status=semua), so match the path
+    // followed by end-of-string or the start of a query string, not a bare $.
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.bookingHistory}(\\?|$)`));
   });
 
   test('should mengarahkan ke halaman profil when menu Profil diklik', async ({ page }) => {
