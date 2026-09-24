@@ -109,10 +109,14 @@ jobs:
       - name: Generate app key
         run: php artisan key:generate
 
-      - name: Wait for MySQL and run migrations
+      - name: Wait for MySQL, run migrations and seed master data
         run: |
           for i in $(seq 1 20); do mysqladmin ping -h127.0.0.1 -uroot --silent && break; sleep 2; done
           php artisan migrate --force
+          # The homepage/booking pages load categories, services and gallery
+          # photos via AJAX from the DB — without this, every UI test that
+          # touches that content fails on an empty CI database.
+          php artisan db:seed --force
 
       - name: Build frontend assets
         run: npm run build

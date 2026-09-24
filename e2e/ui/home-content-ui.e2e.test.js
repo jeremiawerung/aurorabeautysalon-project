@@ -16,8 +16,9 @@ test.describe('Beranda - grid kategori layanan', () => {
 
     await home.waitForServiceCategories();
 
-    // Data master saat ini berisi 5 kategori layanan.
-    await expect(home.serviceCards).toHaveCount(5);
+    // DummySeeder seeds a fixed 6 kategori_layanan (N_KATEGORI = 6), and the
+    // customer-facing ajaxpelanggan() endpoint doesn't filter by status.
+    await expect(home.serviceCards).toHaveCount(6);
     const firstCard = home.serviceCards.first();
     await expect(firstCard.locator('img')).toBeVisible();
     await expect(firstCard.locator('p')).not.toBeEmpty();

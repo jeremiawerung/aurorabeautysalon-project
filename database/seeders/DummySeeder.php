@@ -252,6 +252,28 @@ class DummySeeder extends Seeder
         }
 
         // =========================
+        // 5b) GALERI FOTO (Beranda - galeri "Experience")
+        // =========================
+        if ($has('galeri_fotos') && ! empty($layananIDs)) {
+            if (DB::table('galeri_fotos')->count() === 0) {
+                $this->command->info('> Seeding tabel galeri_fotos ...');
+                foreach (array_slice($layananIDs, 0, 5) as $i => $layId) {
+                    DB::table('galeri_fotos')->insert([
+                        'id_layanan' => $layId,
+                        'path_url' => '/images/gallery-placeholder-'.($i + 1).'.jpg',
+                        'keterangan' => 'Contoh hasil layanan',
+                        'urutan' => $i,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
+                $this->command->info('  - Galeri foto total: 5');
+            }
+        } else {
+            $this->command->warn('! Tabel galeri_fotos tidak ditemukan atau tidak ada layanan, skip galeri');
+        }
+
+        // =========================
         // 6) PELANGGAN (+ sinkron ke users jika ada)
         // =========================
         $pelangganIDs = [];
