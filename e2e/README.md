@@ -21,6 +21,19 @@ npm run test:e2e:ui
 npm run test:e2e:report
 ```
 
+### CI (GitHub Actions)
+
+`.github/workflows/tests.yml` menjalankan PHPUnit di setiap push/PR, lalu seluruh suite
+Playwright ini di job terpisah (MySQL service container, Chromium headless). Grup K (booking +
+pembayaran Midtrans) butuh dua repository secret supaya lulus di CI — tanpa keduanya, job tetap
+jalan tapi test Grup K akan gagal:
+
+- `MIDTRANS_SERVER_KEY`
+- `MIDTRANS_CLIENT_KEY`
+
+Tambahkan di **Settings → Secrets and variables → Actions** pada repo GitHub, isi dengan
+kredensial Sandbox Midtrans (bukan production).
+
 ### Prasyarat
 
 - MySQL menyala dan database `db_aurora_beauty_salon` berisi data master
