@@ -263,15 +263,8 @@ class PembayaranController extends Controller
                 ]),
             ];
 
-            // 7. Ambil Token Snap TUNGGALATAU Bypass jika Tunai
-            $metodeCek = \App\Models\MetodePembayaran::find($metodeId);
-            $isTunai = ($metodeCek && strtolower($metodeCek->nama) === 'tunai');
-
-            if ($isTunai) {
-                $snapToken = 'CASH-PAYMENT-BYPASS';
-            } else {
-                $snapToken = Snap::getSnapToken($params);
-            }
+            // 7. Ambil Token Snap TUNGGAL
+            $snapToken = Snap::getSnapToken($params);
 
             // Simpan rincian hasil hitungan server. Callback JS nanti cuma boleh pakai data ini,
             // bukan nominal/diskon yang dikirim browser.
@@ -280,7 +273,6 @@ class PembayaranController extends Controller
                 'total' => $totalGrossAmount,
                 'metode_id' => $metodeId,
                 'pay_type' => $payType,
-                'is_tunai' => $isTunai,
                 'items' => collect($affectedReservasi)->map(fn ($item) => [
                     'reservasi_id' => $item['reservasi_id'],
                     'amount' => $item['amount'],
@@ -360,48 +352,40 @@ class PembayaranController extends Controller
             return response()->json(['success' => false, 'message' => 'Transaksi tidak ditemukan.'], 404);
         }
 
-        if (isset($order['is_tunai']) && $order['is_tunai'] === true) {
-            $transactionStatus = 'pending';
-            $fraudStatus = 'accept';
-            $paymentType = 'cash';
-            $grossAmount = (float) $order['total'];
+        // Tanya status asli ke Midtrans
+        try {
+            Config::$serverKey = config('midtrans.serverKey');
+            Config::$isProduction = config('midtrans.isProduction', false);
+            $midtransTrx = Transaction::status($orderId);
+        } catch (\Throwable $e) {
+            Log::error('Midtrans Callback: gagal cek status ke Midtrans', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Status pembayaran belum bisa dipastikan. Silakan cek riwayat booking beberapa saat lagi.',
+            ], 502);
+        }
+
+        $transactionStatus = $midtransTrx->transaction_status ?? null;
+        $fraudStatus = $midtransTrx->fraud_status ?? null;
+        $paymentType = $midtransTrx->payment_type ?? 'unknown';
+        $grossAmount = (float) ($midtransTrx->gross_amount ?? 0);
+
+        if ($transactionStatus === 'settlement' || ($transactionStatus === 'capture' && $fraudStatus === 'accept')) {
+            $midtransStatus = 'paid';
+        } elseif ($transactionStatus === 'pending') {
             $midtransStatus = 'pending';
         } else {
-            // Tanya status asli ke Midtrans
-            try {
-                Config::$serverKey = config('midtrans.serverKey');
-                Config::$isProduction = config('midtrans.isProduction', false);
-                $midtransTrx = Transaction::status($orderId);
-            } catch (\Throwable $e) {
-                Log::error('Midtrans Callback: gagal cek status ke Midtrans', [
-                    'order_id' => $orderId,
-                    'error' => $e->getMessage(),
-                ]);
+            Log::warning('Midtrans Callback: Transaksi bukan status simpan.', [
+                'order_id' => $orderId,
+                'status' => $transactionStatus,
+                'fraud_status' => $fraudStatus,
+            ]);
 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Status pembayaran belum bisa dipastikan. Silakan cek riwayat booking beberapa saat lagi.',
-                ], 502);
-            }
-
-            $transactionStatus = $midtransTrx->transaction_status ?? null;
-            $fraudStatus = $midtransTrx->fraud_status ?? null;
-            $paymentType = $midtransTrx->payment_type ?? 'unknown';
-            $grossAmount = (float) ($midtransTrx->gross_amount ?? 0);
-
-            if ($transactionStatus === 'settlement' || ($transactionStatus === 'capture' && $fraudStatus === 'accept')) {
-                $midtransStatus = 'paid';
-            } elseif ($transactionStatus === 'pending') {
-                $midtransStatus = 'pending';
-            } else {
-                Log::warning('Midtrans Callback: Transaksi bukan status simpan.', [
-                    'order_id' => $orderId,
-                    'status' => $transactionStatus,
-                    'fraud_status' => $fraudStatus,
-                ]);
-
-                return response()->json(['success' => false, 'message' => 'Transaksi gagal/dibatalkan. Tidak ada data yang disimpan.'], 400);
-            }
+            return response()->json(['success' => false, 'message' => 'Transaksi gagal/dibatalkan. Tidak ada data yang disimpan.'], 400);
         }
 
         // Nominal di Midtrans harus sama dengan hasil hitungan server waktu checkout
