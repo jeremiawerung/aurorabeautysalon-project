@@ -18,10 +18,12 @@ class AdminSeeder extends Seeder
         $user = User::create([
             'name' => 'Admin Aurora',
             'email' => 'admin@aurorabeauty.com',
-            'password' => Hash::make('password123'),
+            'password' => Hash::make(env('ADMIN_DEFAULT_PASSWORD', 'AuroraBeauty2026!')),
             'email_verified_at' => now(), // Admin langsung terverifikasi
-            'role' => 'admin',
+            
         ]);
+        $user->role = 'admin';
+        $user->save();
 
         // Create admin in admin table
         Admin::create([

@@ -287,7 +287,7 @@ class BookingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memproses layanan: '.$e->getMessage(),
+                'message' => 'Gagal memproses layanan: '. . " Silakan coba lagi nanti.",
             ], 500);
         }
     }
@@ -394,7 +394,7 @@ class BookingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memperbarui jadwal. Error: '.$e->getMessage(),
+                'message' => 'Gagal memperbarui jadwal. Error: '. . " Silakan coba lagi nanti.",
             ], 500);
         }
     }
@@ -624,8 +624,8 @@ class BookingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: '.$e->getMessage(),
-                'debug' => $e->getMessage().' on line '.$e->getLine(),
+                'message' => 'Terjadi kesalahan: '. . " Silakan coba lagi nanti.",
+                
             ], 500);
         }
     }
@@ -951,6 +951,7 @@ class BookingController extends Controller
             'pelanggan.user',
         ])
             ->whereIn('id_reservasi', $reservasiIds)
+            ->where('id_pelanggan', $this->getCurrentPelangganId() ?? 0) // anti IDOR: cuma reservasi milik sendiri
             ->get();
 
         if ($reservasiList->isEmpty()) {
@@ -1464,7 +1465,7 @@ class BookingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil riwayat: ' . $e->getMessage(),
+                'message' => 'Terjadi kesalahan saat mengambil riwayat: ' .  . " Silakan coba lagi nanti.",
             ], 500);
         }
     }

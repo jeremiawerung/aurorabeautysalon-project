@@ -160,7 +160,7 @@ class SlotJadwalController extends Controller
             return redirect()->route('slot-jadwal.index');
         } catch (\Exception $e) {
             Log::error('Error menyimpan slot jadwal: '.$e->getMessage());
-            session()->flash('error', '❌ Gagal menyimpan slot jadwal: '.$e->getMessage());
+            session()->flash('error', '❌ Gagal menyimpan slot jadwal: '. . " Silakan coba lagi nanti.");
 
             return redirect()->back()->withInput();
         }
@@ -226,7 +226,7 @@ class SlotJadwalController extends Controller
             return redirect()->route('slot-jadwal.index');
         } catch (\Exception $e) {
             Log::error('Error mengupdate slot jadwal: '.$e->getMessage());
-            session()->flash('error', 'Gagal memperbarui slot jadwal: '.$e->getMessage());
+            session()->flash('error', 'Gagal memperbarui slot jadwal: '. . " Silakan coba lagi nanti.");
 
             return redirect()->back()->withInput();
         }

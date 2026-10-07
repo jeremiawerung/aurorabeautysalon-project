@@ -25,5 +25,9 @@ class AppServiceProvider extends ServiceProvider
         // ext-fileinfo/proc_open yang dibutuhkan guesser bawaan Symfony, jadi validasi
         // `mimes:` di form upload bisa fatal error tanpa ini.
         MimeTypes::getDefault()->registerGuesser(new SignatureMimeTypeGuesser);
+
+        if (config('app.env') === 'production') {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
     }
 }

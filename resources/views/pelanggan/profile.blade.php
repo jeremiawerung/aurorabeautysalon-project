@@ -262,6 +262,20 @@
                 @csrf
 
                 <div class="form-group">
+                    <label class="form-label" for="current_password">{{ __('profile.current_password') ?? 'Password Lama' }}</label>
+                    <input
+                        type="password"
+                        id="current_password"
+                        name="current_password"
+                        class="form-input"
+                        required
+                        autocomplete="current-password">
+                    @error('current_password')
+                        <div class="text-danger">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div class="form-group">
                     <label class="form-label" for="password">{{ __('profile.new_password') }}</label>
                     <input
                         type="password"

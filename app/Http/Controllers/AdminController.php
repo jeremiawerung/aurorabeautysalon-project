@@ -58,7 +58,7 @@ class AdminController extends Controller
 
     public function store(Request $request)
     {
-        Log::info('Data Registrasi Admin:', $request->all());
+        // Menghapus log yang berisi seluruh request (termasuk password)
 
         $request->validate([
             'nama' => 'required|string|max:255',
@@ -71,8 +71,10 @@ class AdminController extends Controller
              'name' => $request->nama,
              'email' => $request->email,
              'password' => Hash::make($request->password),
-             'role' => 'admin',
+             
         ]);
+        $user->role = 'admin';
+        $user->save();
 
         event(new Registered($user));
 
@@ -137,9 +139,11 @@ class AdminController extends Controller
         ]);
 
         $admin = Admin::findOrFail($id);
-
-        $admin->password = Hash::make($request->password);
-        $admin->save();
+        $user = \App\Models\User::find($admin->user_id);
+        if ($user) {
+            $user->password = Hash::make($request->password);
+            $user->save();
+        }
 
         return redirect()->route('admin.index')
             ->with('success', 'Password berhasil diubah');
@@ -155,7 +159,11 @@ class AdminController extends Controller
                     ->with('error', 'Tidak dapat menghapus akun yang sedang aktif');
             }
 
+            $userId = $admin->user_id;
             $admin->delete();
+            if ($userId) {
+                \App\Models\User::destroy($userId);
+            }
 
             return redirect()->route('admin.index')
                 ->with('success', 'Admin berhasil dihapus');

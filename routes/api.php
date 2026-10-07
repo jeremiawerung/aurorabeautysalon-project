@@ -6,9 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/midtrans/notification', [PembayaranController::class, 'notificationHandler']);
 
-Route::get('/abc', function () {
-    return 'abc';
-});
+
 
 Route::get('/user', function (Request $request) {
     return $request->user();

@@ -20,39 +20,39 @@ class ForgotPasswordController extends Controller
     public function sendResetLinkEmail(Request $request)
     {
         $request->validate([
-            'email' => 'required|email|exists:users,email',
+            'email' => 'required|email',
         ], [
             'email.required' => 'Email harus diisi.',
             'email.email' => 'Format email tidak valid.',
-            'email.exists' => 'Email tidak terdaftar di sistem kami.',
         ]);
 
-        $token = Str::random(60);
+        $user = User::where('email', $request->email)->first();
+        if ($user) {
+            $token = Str::random(60);
 
-        DB::table('password_reset_tokens')->updateOrInsert(
-            ['email' => $request->email],
-            [
-                'token' => Hash::make($token),
-                'created_at' => now(),
-            ]
-        );
+            DB::table('password_reset_tokens')->updateOrInsert(
+                ['email' => $request->email],
+                [
+                    'token' => Hash::make($token),
+                    'created_at' => now(),
+                ]
+            );
 
-        $resetUrl = url('/reset-password/'.$token.'?email='.urlencode($request->email));
+            $resetUrl = url('/reset-password/'.$token.'?email='.urlencode($request->email));
 
-        try {
-            Mail::send('emails.password-reset', ['resetUrl' => $resetUrl], function ($message) use ($request) {
-                $message->to($request->email)
-                    ->subject('Reset Password - Aurora Beauty Salon');
-            });
-
-            return back()->with([
-                'status' => '✅ Link reset password telah dikirim ke email Anda! Silakan cek email (termasuk folder spam/junk).',
-            ]);
-        } catch (\Exception $e) {
-            return back()->withErrors([
-                'email' => 'Gagal mengirim email. Silakan coba lagi atau hubungi admin.',
-            ]);
+            try {
+                Mail::send('emails.password-reset', ['resetUrl' => $resetUrl], function ($message) use ($request) {
+                    $message->to($request->email)
+                        ->subject('Reset Password - Aurora Beauty Salon');
+                });
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Failed to send reset email: ' . $e->getMessage());
+            }
         }
+
+        return back()->with([
+            'status' => 'Jika email Anda terdaftar, link reset password telah dikirim. Silakan cek email (termasuk folder spam/junk).',
+        ]);
     }
 
     public function showResetForm(Request $request, $token = null)
@@ -86,7 +86,7 @@ class ForgotPasswordController extends Controller
             return back()->withErrors(['token' => 'Token reset tidak valid atau sudah kadaluarsa.']);
         }
 
-        if (now()->diffInMinutes($tokenRecord->created_at) > 60) {
+        if (\Carbon\Carbon::parse($tokenRecord->created_at)->addMinutes(60)->isPast()) {
             // Delete expired token
             DB::table('password_reset_tokens')->where('email', $request->email)->delete();
 

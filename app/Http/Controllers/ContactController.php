@@ -109,7 +109,6 @@ class ContactController extends Controller
 
             Log::error('Contact form send error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'payload' => $data,
             ]);
 
             return back()

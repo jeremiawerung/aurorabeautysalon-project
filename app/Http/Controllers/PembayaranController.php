@@ -15,12 +15,14 @@ use App\Models\Reservasi;
 use Barryvdh\DomPDF\Facade\Pdf as PDF;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 use Midtrans\Config;
 use Midtrans\Notification;
 use Midtrans\Snap;
+use Midtrans\Transaction;
 use App\Traits\AdminNotifiable;
 
 
@@ -28,9 +30,73 @@ class PembayaranController extends Controller
 {
     use AdminNotifiable;
 
+    /** Prefix cache buat nyimpen rincian order yang dihitung server waktu checkout. */
+    private const ORDER_CACHE_PREFIX = 'midtrans_order:';
+
     public function __construct()
     {
         Carbon::setLocale('id');
+    }
+
+    /**
+     * ID pelanggan milik user yang lagi login (null kalau bukan pelanggan).
+     */
+    private function currentPelangganId(): ?int
+    {
+        return auth()->user()?->pelanggan?->id_pelanggan;
+    }
+
+    /**
+     * Ambil voucher yang valid dari kode. Nominal diskon dari browser TIDAK dipakai,
+     * server selalu menghitung ulang dari data voucher di database.
+     */
+    private function ambilVoucher(?string $kodeDiskon, string $payType): ?array
+    {
+        if (! $kodeDiskon || $payType !== 'full') {
+            return null; // Voucher cuma berlaku buat full payment
+        }
+
+        $diskon = Diskon::where('kode_diskon', $kodeDiskon)
+            ->where('status_diskon', 'aktif')
+            ->first();
+
+        if (! $diskon || ! $diskon->isActive()) {
+            return null;
+        }
+
+        $persen = (float) $diskon->persentase_diskon;
+        if ($persen <= 0) {
+            return null;
+        }
+
+        $layananWithDiskon = Layanan::where('id_diskon', $diskon->id)->pluck('id_layanan')->all();
+
+        return [
+            'id' => $diskon->id,
+            'persen' => $persen,
+            'is_global' => empty($layananWithDiskon),
+        ];
+    }
+
+    /**
+     * Hitung diskon voucher buat satu reservasi (logika sama dengan validateVoucher).
+     */
+    private function diskonUntukReservasi(?array $voucher, Reservasi $reservasi, float $amountToPay): float
+    {
+        if (! $voucher || $amountToPay <= 0) {
+            return 0;
+        }
+
+        $eligible = $reservasi->reservasiLayanan->contains(function ($resLay) use ($voucher) {
+            return $resLay->layanan
+                && ($voucher['is_global'] || $resLay->layanan->id_diskon == $voucher['id']);
+        });
+
+        if (! $eligible) {
+            return 0;
+        }
+
+        return round(min($amountToPay * ($voucher['persen'] / 100), $amountToPay), 2);
     }
 
     public function proses(Request $request)
@@ -41,13 +107,23 @@ class PembayaranController extends Controller
             'metode_id' => 'nullable|integer|exists:metodepembayaran,id_metodePembayaran',
             'reservasi_ids' => 'required|array|min:1',
             'reservasi_ids.*' => 'integer|exists:reservasi,id_reservasi',
-            'diskon_data' => 'nullable|array', // TAMBAHAN BARU untuk voucher
+            'diskon_data' => 'nullable|array', // Cuma kode_diskon yang dipakai, nominalnya dihitung ulang di server
+            'diskon_data.kode_diskon' => 'nullable|string|max:50',
         ]);
 
-        $reservasiIds = $request->reservasi_ids;
+        $reservasiIds = array_values(array_unique(array_map('intval', $request->reservasi_ids)));
         $payType = $request->pay_type;
         $metodeId = $request->metode_id;
-        $diskonData = $request->diskon_data; // TAMBAHAN BARU
+        $diskonData = $request->diskon_data;
+
+        // Reservasi wajib punya pelanggan yang lagi login (anti IDOR)
+        $idPelanggan = $this->currentPelangganId();
+        if (! $idPelanggan) {
+            return response()->json(['success' => false, 'message' => 'Akun pelanggan tidak ditemukan.'], 403);
+        }
+
+        // Voucher dicek ulang di server dari kodenya
+        $voucher = $this->ambilVoucher($diskonData['kode_diskon'] ?? null, $payType);
 
         try {
             // 2. Konfigurasi Midtrans
@@ -67,11 +143,21 @@ class PembayaranController extends Controller
             $affectedReservasi = [];
 
             // 4. Loop Reservasi untuk Hitung Total Bayar
-            $reservasiModels = Reservasi::with(['pelanggan.user', 'pembayaran' => function ($query) {
+            $reservasiModels = Reservasi::with(['pelanggan.user', 'reservasiLayanan.layanan', 'pembayaran' => function ($query) {
                 $query->whereIn('status_pembayaran', ['bayar_lunas', 'bayar_dp']);
             }])
                 ->whereIn('id_reservasi', $reservasiIds)
+                ->where('id_pelanggan', $idPelanggan)
                 ->get();
+
+            if ($reservasiModels->count() !== count($reservasiIds)) {
+                Log::warning('Midtrans proses: ada reservasi yang bukan milik pelanggan', [
+                    'user_id' => auth()->id(),
+                    'reservasi_ids' => $reservasiIds,
+                ]);
+
+                return response()->json(['success' => false, 'message' => 'Reservasi tidak ditemukan.'], 404);
+            }
 
             foreach ($reservasiModels as $reservasi) {
                 $customer = $reservasi->pelanggan;
@@ -116,16 +202,8 @@ class PembayaranController extends Controller
                     $paymentName = 'Pembayaran Penuh Reservasi';
                 }
 
-                // TAMBAHAN BARU: Cari dan aplikasikan diskon untuk reservasi ini
-                $diskonAmount = 0;
-                if ($diskonData && isset($diskonData['applicable_reservasi'])) {
-                    foreach ($diskonData['applicable_reservasi'] as $appRes) {
-                        if ($appRes['id_reservasi'] == $reservasi->id_reservasi) {
-                            $diskonAmount = (float) $appRes['diskon'];
-                            break;
-                        }
-                    }
-                }
+                // Diskon dihitung ulang di server, gak diambil dari browser
+                $diskonAmount = $this->diskonUntukReservasi($voucher, $reservasi, (float) $amountToPay);
 
                 // Kurangi dengan diskon
                 $amountToPay = max(0, $amountToPay - $diskonAmount);
@@ -169,7 +247,7 @@ class PembayaranController extends Controller
             }
 
             // 6. Generate Order ID TUNGGAL
-            $orderId = 'TRX-MULTI-'.time().'-'.rand(100, 999);
+            $orderId = 'TRX-MULTI-'.time().'-'.random_int(100000, 999999);
 
             $params = [
                 'transaction_details' => [
@@ -187,6 +265,20 @@ class PembayaranController extends Controller
 
             // 7. Ambil Token Snap TUNGGAL
             $snapToken = Snap::getSnapToken($params);
+
+            // Simpan rincian hasil hitungan server. Callback JS nanti cuma boleh pakai data ini,
+            // bukan nominal/diskon yang dikirim browser.
+            Cache::put(self::ORDER_CACHE_PREFIX.$orderId, [
+                'user_id' => auth()->id(),
+                'total' => $totalGrossAmount,
+                'metode_id' => $metodeId,
+                'pay_type' => $payType,
+                'items' => collect($affectedReservasi)->map(fn ($item) => [
+                    'reservasi_id' => $item['reservasi_id'],
+                    'amount' => $item['amount'],
+                    'diskon_amount' => $item['diskon_amount'],
+                ])->all(),
+            ], now()->addDays(3));
 
             // 8. Kembalikan respons tunggal
             return response()->json([
@@ -228,59 +320,97 @@ class PembayaranController extends Controller
         } catch (\Throwable $e) {
             Log::error('Midtrans proses error (Multi): '.$e->getMessage());
 
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Gagal memproses pembayaran. Silakan coba lagi.'], 500);
         }
     }
 
     public function midtransJsCallback(Request $request)
     {
-        // 1. Validasi Input dari JS
+        // KEAMANAN: Status, nominal, dan diskon dari browser TIDAK dipercaya.
+        // Yang dipakai dari request cuma order_id. Rinciannya diambil dari cache hasil proses(),
+        // terus statusnya ditanyain langsung ke Midtrans.
         try {
             $request->validate([
-                'reservasi_ids' => 'required|array|min:1',
-                'order_id' => 'required|string',
-                'transaction_status' => 'required|string',
-                'payment_type' => 'required|string',
-                'metode_id' => 'required|integer|exists:metodepembayaran,id_metodePembayaran',
-                'amounts' => 'required|array',
-                'amounts.*.reservasi_id' => 'required|integer|exists:reservasi,id_reservasi',
-                'amounts.*.amount' => 'required|numeric|min:0',
-                'pay_type_selected' => 'required|in:dp,full',
-                'diskon_data' => 'nullable|array', // TAMBAHAN BARU
+                'order_id' => 'required|string|max:100',
+                'metode_id' => 'nullable|integer|exists:metodepembayaran,id_metodePembayaran',
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('Midtrans Callback Validation Error: '.$e->getMessage());
+            Log::warning('Midtrans Callback Validation Error: '.$e->getMessage());
 
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            return response()->json(['success' => false, 'message' => 'Data pembayaran tidak valid.'], 422);
         }
 
-        $reservasiIds = $request->reservasi_ids;
         $orderId = $request->order_id;
-        $transactionStatus = $request->transaction_status;
-        $paymentType = $request->payment_type;
-        $metodeId = $request->metode_id;
-        $amountsPaid = collect($request->amounts)->keyBy('reservasi_id');
-        $payTypeSelected = $request->pay_type_selected;
-        $diskonData = $request->diskon_data; // TAMBAHAN BARU
+        $order = Cache::get(self::ORDER_CACHE_PREFIX.$orderId);
 
-        // 2. Tentukan status pembayaran yang valid untuk disimpan
-        $validStatusToSave = ['capture', 'settlement', 'pending'];
+        if (! $order || (int) $order['user_id'] !== (int) auth()->id()) {
+            Log::warning('Midtrans Callback: order tidak dikenal atau bukan milik user', [
+                'order_id' => $orderId,
+                'user_id' => auth()->id(),
+            ]);
 
-        if (! in_array($transactionStatus, $validStatusToSave)) {
-            Log::warning('Midtrans Callback: Transaksi bukan status simpan. Status: '.$transactionStatus);
+            return response()->json(['success' => false, 'message' => 'Transaksi tidak ditemukan.'], 404);
+        }
+
+        // Tanya status asli ke Midtrans
+        try {
+            Config::$serverKey = config('midtrans.serverKey');
+            Config::$isProduction = config('midtrans.isProduction', false);
+            $midtransTrx = Transaction::status($orderId);
+        } catch (\Throwable $e) {
+            Log::error('Midtrans Callback: gagal cek status ke Midtrans', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Status pembayaran belum bisa dipastikan. Silakan cek riwayat booking beberapa saat lagi.',
+            ], 502);
+        }
+
+        $transactionStatus = $midtransTrx->transaction_status ?? null;
+        $fraudStatus = $midtransTrx->fraud_status ?? null;
+        $paymentType = $midtransTrx->payment_type ?? 'unknown';
+        $grossAmount = (float) ($midtransTrx->gross_amount ?? 0);
+
+        if ($transactionStatus === 'settlement' || ($transactionStatus === 'capture' && $fraudStatus === 'accept')) {
+            $midtransStatus = 'paid';
+        } elseif ($transactionStatus === 'pending') {
+            $midtransStatus = 'pending';
+        } else {
+            Log::warning('Midtrans Callback: Transaksi bukan status simpan.', [
+                'order_id' => $orderId,
+                'status' => $transactionStatus,
+                'fraud_status' => $fraudStatus,
+            ]);
 
             return response()->json(['success' => false, 'message' => 'Transaksi gagal/dibatalkan. Tidak ada data yang disimpan.'], 400);
         }
 
+        // Nominal di Midtrans harus sama dengan hasil hitungan server waktu checkout
+        if (abs($grossAmount - (float) $order['total']) > 1) {
+            Log::warning('Midtrans Callback: nominal tidak cocok', [
+                'order_id' => $orderId,
+                'midtrans' => $grossAmount,
+                'server' => $order['total'],
+            ]);
+
+            return response()->json(['success' => false, 'message' => 'Nominal pembayaran tidak cocok. Silakan hubungi admin.'], 400);
+        }
+
+        $metodeId = $order['metode_id'] ?? $request->metode_id;
+        $payTypeSelected = $order['pay_type'];
+        $orderItems = collect($order['items'])->keyBy('reservasi_id');
+
         DB::beginTransaction();
         try {
-            $midtransStatus = ($transactionStatus === 'pending' ? 'pending' : 'paid');
             $updatedReservasiIds = [];
 
-            // 3. Loop untuk setiap Reservasi yang terlibat
-            foreach ($reservasiIds as $rid) {
-                $amountData = $amountsPaid->get((int) $rid);
-                $amountToSave = $amountData['amount'] ?? 0;
+            // 3. Loop untuk setiap Reservasi yang terlibat (data dari server, bukan dari browser)
+            foreach ($orderItems as $rid => $item) {
+                $rid = (int) $rid;
+                $amountToSave = (float) $item['amount'];
 
                 if ($amountToSave <= 0) {
                     continue;
@@ -288,16 +418,7 @@ class PembayaranController extends Controller
 
                 $order_id_per_reservasi = $orderId.'-'.$rid;
 
-                // TAMBAHAN BARU: Ambil diskon amount untuk reservasi ini
-                $diskonAmount = 0;
-                if ($diskonData && isset($diskonData['applicable_reservasi'])) {
-                    foreach ($diskonData['applicable_reservasi'] as $appRes) {
-                        if ($appRes['id_reservasi'] == $rid) {
-                            $diskonAmount = (float) $appRes['diskon'];
-                            break;
-                        }
-                    }
-                }
+                $diskonAmount = (float) $item['diskon_amount'];
 
                 // Cek apakah pembayaran dengan Order ID (order_id) sudah pernah disimpan untuk reservasi ini
                 $existingPayment = Pembayaran::where('order_id', $order_id_per_reservasi)
@@ -955,7 +1076,7 @@ class PembayaranController extends Controller
         } catch (\Throwable $e) {
             Log::error('Import pembayaran gagal: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
 
-            return back()->with('error', 'Gagal import pembayaran: '.$e->getMessage());
+            return back()->with('error', 'Gagal import pembayaran: '. . " Silakan coba lagi nanti.");
         }
     }
 
@@ -1267,7 +1388,7 @@ public function validateVoucher(Request $request)
         $dpTipe = $pengaturanDp?->dp_tipe ?? 'persen';
         $dpValue = (float)($pengaturanDp?->dp_value ?? 30);
 
-        // Ambil semua reservasi yang dipilih dengan relasi lengkap
+        // Ambil semua reservasi yang dipilih dengan relasi lengkap (cuma punya pelanggan yang login)
         $reservasiIds = $request->reservasi_ids;
         $reservasiModels = Reservasi::with([
             'reservasiLayanan.layanan' => function($query) {
@@ -1279,6 +1400,7 @@ public function validateVoucher(Request $request)
             }
         ])
         ->whereIn('id_reservasi', $reservasiIds)
+        ->where('id_pelanggan', $this->currentPelangganId() ?? 0)
         ->get();
 
         // Debug: Cek data reservasi yang di-load
@@ -1609,7 +1731,7 @@ public function validateVoucher(Request $request)
 
         return response()->json([
             'success' => false,
-            'message' => 'Terjadi kesalahan saat memvalidasi voucher: ' . $e->getMessage(),
+            'message' => 'Terjadi kesalahan saat memvalidasi voucher: ' .  . " Silakan coba lagi nanti.",
         ], 500);
     }
 }

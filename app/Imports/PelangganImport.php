@@ -92,9 +92,11 @@ class PelangganImport implements OnEachRow, WithHeadingRow
                     'name' => $nama,
                     'email' => $email,
                     'password' => Hash::make($password),
-                    'role' => 'pelanggan',
+                    
                     'email_verified_at' => now(),
                 ]);
+        $user->role = 'pelanggan';
+        $user->save();
             } else {
                 $user->update([
                     'name' => $nama,

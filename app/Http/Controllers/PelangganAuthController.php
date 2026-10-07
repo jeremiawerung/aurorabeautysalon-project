@@ -29,9 +29,11 @@ class PelangganAuthController extends Controller
             'name' => $request->nama,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => 'pelanggan',
+            
             'email_verified_at' => null, // Force null
         ]);
+        $user->role = 'pelanggan';
+        $user->save();
 
         $pelanggan = Pelanggan::create([
             'user_id' => $user->id,

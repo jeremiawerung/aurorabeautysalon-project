@@ -327,6 +327,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     // State & Data
     let dataPelanggan = [], viewPelanggan = [];
     let stateP = { page: 1, perPage: 10 };
@@ -427,17 +428,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 html += `<tr>
                     <td>${(i + 1) + (page-1)*stateP.perPage}</td>
-                    <td>${p.nama}</td>
-                    <td>${p.id_pelanggan || '-'}</td>
-                    <td>${p.formatted_nomor || p.nomor_telepon || '-'}</td>
-                    <td>${p.email || '-'}</td>
-                    <td><span class="badge ${badgeClass}">${p.formatted_status || p.status_pelanggan || '-'}</span></td>
-                    <td>${p.formatted_tanggal_daftar || '-'}</td>
+                    <td>${esc(p.nama)}</td>
+                    <td>${esc(p.id_pelanggan || '-')}</td>
+                    <td>${esc(p.formatted_nomor || p.nomor_telepon || '-')}</td>
+                    <td>${esc(p.email || '-')}</td>
+                    <td><span class="badge ${badgeClass}">${esc(p.formatted_status || p.status_pelanggan || '-')}</span></td>
+                    <td>${esc(p.formatted_tanggal_daftar || '-')}</td>
                     <td>
                         <button class="btn btn-sm btn-info text-white btn-detail-pelanggan"
-                            data-nama="${p.nama}"
-                            data-email="${p.email}"
-                            data-updated="${p.updated_at || '-'}"
+                            data-nama="${esc(p.nama)}"
+                            data-email="${esc(p.email)}"
+                            data-updated="${esc(p.updated_at || '-')}"
                         >
                             <i class="fas fa-info-circle"></i> Detail
                         </button>
@@ -524,29 +525,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
         html += `<tr>
           <td>${(i + 1) + (page-1)*stateT.perPage}</td>
-          <td>${t.pelanggan_nama}</td>
-          <td>${t.id_reservasi || '-'}</td>
-          <td>${t.formatted_jumlah}</td> <!-- Total Paid -->
-          <td>${t.formatted_diskon}</td>
-          <td>${t.formatted_biaya_tambahan || '-'}</td> <!-- BARU -->
-          <td>${t.formatted_total}</td>   <!-- Total Tagihan -->
-          <td><span class="badge ${badgeClass}">${t.formatted_status}</span></td>
-          <td>${t.formatted_metode}</td>
-          <td>${t.formatted_tanggal}</td>
+          <td>${esc(t.pelanggan_nama)}</td>
+          <td>${esc(t.id_reservasi || '-')}</td>
+          <td>${esc(t.formatted_jumlah)}</td> <!-- Total Paid -->
+          <td>${esc(t.formatted_diskon)}</td>
+          <td>${esc(t.formatted_biaya_tambahan || '-')}</td> <!-- BARU -->
+          <td>${esc(t.formatted_total)}</td>   <!-- Total Tagihan -->
+          <td><span class="badge ${badgeClass}">${esc(t.formatted_status)}</span></td>
+          <td>${esc(t.formatted_metode)}</td>
+          <td>${esc(t.formatted_tanggal)}</td>
           <td class="text-center">
             <div class="d-flex justify-content-center gap-1">
                 <!-- ... (Buttons) ... -->
                 <button class="btn btn-info btn-sm text-white btn-detail-trx" type="button"
-                    data-id="${t.id_reservasi}"
-                    data-status="${t.formatted_status}"
-                    data-pelanggan="${t.pelanggan_nama}"
-                    data-telp="${t.pelanggan_telp}"
-                    data-layanan="${t.layanan_nama}"
-                    data-catatan="${t.catatan}"
-                    data-total-res="${t.formatted_total_reservasi}"
-                    data-total-paid="${t.formatted_total_paid}"
-                    data-sisa="${t.formatted_sisa}"
-                    data-history='${JSON.stringify(t.payment_history || [])}'
+                    data-id="${esc(t.id_reservasi)}"
+                    data-status="${esc(t.formatted_status)}"
+                    data-pelanggan="${esc(t.pelanggan_nama)}"
+                    data-telp="${esc(t.pelanggan_telp)}"
+                    data-layanan="${esc(t.layanan_nama)}"
+                    data-catatan="${esc(t.catatan)}"
+                    data-total-res="${esc(t.formatted_total_reservasi)}"
+                    data-total-paid="${esc(t.formatted_total_paid)}"
+                    data-sisa="${esc(t.formatted_sisa)}"
+                    data-history='${esc(JSON.stringify(t.payment_history || []))}'
                 >
                     <i class="fas fa-info-circle"></i> Detail
                 </button>
@@ -555,7 +556,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         Aksi
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="#" onclick="openUpdateStatusModal(${t.id_reservasi}, '${t.formatted_status}')">Ubah Status</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="openUpdateStatusModal(${t.id_reservasi}, '${esc(t.formatted_status)}')">Ubah Status</a></li>
                         <li><a class="dropdown-item" href="#" onclick="openAddCostModal(${t.id_reservasi})"><i class="fas fa-plus-circle"></i> Biaya Tambahan</a></li>
                         ${ t.sisa_pembayaran > 0 ? 
                         `<li><a class="dropdown-item text-success" href="#" onclick="openMarkPaidModal(${t.id_reservasi}, ${t.sisa_pembayaran})"><i class="fas fa-money-bill-wave"></i> Tandai Lunas</a></li>` 
@@ -649,10 +650,10 @@ document.addEventListener('DOMContentLoaded', function() {
                   historyData.forEach(function(h) {
                       const row = `
                         <tr>
-                            <td>${h.tanggal}</td>
-                            <td><span class="badge ${h.tipe === 'DP' ? 'bg-info' : 'bg-success'}">${h.tipe}</span></td>
-                            <td class="text-end">${h.jumlah}</td>
-                            <td>${h.metode}</td>
+                            <td>${esc(h.tanggal)}</td>
+                            <td><span class="badge ${h.tipe === 'DP' ? 'bg-info' : 'bg-success'}">${esc(h.tipe)}</span></td>
+                            <td class="text-end">${esc(h.jumlah)}</td>
+                            <td>${esc(h.metode)}</td>
                         </tr>
                       `;
                       historyBody.innerHTML += row;

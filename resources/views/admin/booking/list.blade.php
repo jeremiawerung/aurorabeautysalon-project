@@ -132,6 +132,7 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     // State
     let dataBooking = [];
     let viewBooking = [];
@@ -197,14 +198,14 @@ document.addEventListener("DOMContentLoaded", function() {
                 return `
                     <tr>
                         <td>${no}</td>
-                        <td>${item.id_reservasi}</td>
-                        <td>${item.pelanggan_nama}</td>
-                        <td class="text-wrap" style="max-width: 200px;">${item.layanan_nama}</td>
-                        <td>${item.tanggal}</td>
-                        <td>${item.jam}</td>
-                        <td><span class="badge ${item.status_class}">${item.formatted_status}</span></td>
+                        <td>${esc(item.id_reservasi)}</td>
+                        <td>${esc(item.pelanggan_nama)}</td>
+                        <td class="text-wrap" style="max-width: 200px;">${esc(item.layanan_nama)}</td>
+                        <td>${esc(item.tanggal)}</td>
+                        <td>${esc(item.jam)}</td>
+                        <td><span class="badge ${item.status_class}">${esc(item.formatted_status)}</span></td>
                         <td>
-                            <button class="btn btn-sm btn-outline-primary" onclick="openUpdateStatusModal(${item.id_reservasi}, '${item.status_reservasi}')">
+                            <button class="btn btn-sm btn-outline-primary" onclick="openUpdateStatusModal(${item.id_reservasi}, '${esc(item.status_reservasi)}')">
                                 <i class="fas fa-edit"></i> Ubah Status
                             </button>
                         </td>

@@ -53,7 +53,7 @@ class PelangganController extends Controller
         } catch (\Throwable $e) {
             Log::error('Import pelanggan gagal: '.$e->getMessage());
 
-            return back()->with('error', 'Gagal import: '.$e->getMessage());
+            return back()->with('error', 'Gagal import: '. . " Silakan coba lagi nanti.");
         }
     }
 
@@ -123,9 +123,11 @@ class PelangganController extends Controller
                 'name' => $validated['nama'],
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
-                'role' => 'pelanggan',
+                
                 'email_verified_at' => now(),
             ]);
+        $user->role = 'pelanggan';
+        $user->save();
 
             Pelanggan::create([
                 'user_id' => $user->id,

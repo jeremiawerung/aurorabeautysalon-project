@@ -152,7 +152,7 @@ class LayananController extends Controller
             DB::rollBack();
             Log::error('Import Layanan Error: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
 
-            return back()->with('error', '❌ Gagal import: '.$e->getMessage());
+            return back()->with('error', '❌ Gagal import: '. . " Silakan coba lagi nanti.");
         }
     }
 

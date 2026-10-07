@@ -159,6 +159,10 @@ document.addEventListener("DOMContentLoaded", function() {
     const approveUrl = '{{ route("admin.konfirmasi-pembatalan.approve", ["id" => "_ID_"]) }}';
     const rejectUrl = '{{ route("admin.konfirmasi-pembatalan.reject", ["id" => "_ID_"]) }}';
 
+    // Escape data dari user sebelum dimasukin ke innerHTML (anti XSS)
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const digits = (v) => String(v ?? '').replace(/[^0-9]/g, '');
+
     function paginate(arr, p, n) {
         const total = arr.length, totalPages = Math.max(1, Math.ceil(total / n));
         const page = Math.min(Math.max(1, p), totalPages);
@@ -221,31 +225,31 @@ document.addEventListener("DOMContentLoaded", function() {
                 const badgeClass = getBadgeClass(item.status_pembayaran);
                 const badgeText = getBadgeText(item.status_pembayaran);
                 const layananText = item.total_layanan_lain > 0 
-                    ? `${item.nama_layanan} +${item.total_layanan_lain} lainnya`
-                    : item.nama_layanan;
+                    ? `${esc(item.nama_layanan)} +${Number(item.total_layanan_lain)} lainnya`
+                    : esc(item.nama_layanan);
 
                 return `
                 <tr>
                     <td>${(idx + 1) + ((page - 1) * state.perPage)}</td>
-                    <td>#${item.id_reservasi}</td>
-                    <td>${item.nama_pelanggan}</td>
+                    <td>#${Number(item.id_reservasi)}</td>
+                    <td>${esc(item.nama_pelanggan)}</td>
                     <td>${layananText}</td>
-                    <td>${item.tanggal_reservasi} ${item.waktu_reservasi}</td>
+                    <td>${esc(item.tanggal_reservasi)} ${esc(item.waktu_reservasi)}</td>
                     <td><span class="badge ${badgeClass}">${badgeText}</span></td>
                     <td>Rp ${item.jumlah_dibayar.toLocaleString('id-ID')}</td>
                     <td>
-                        <button class="btn btn-outline-info btn-aksi" onclick="showDetail(${item.id_reservasi})">
+                        <button class="btn btn-outline-info btn-aksi" onclick="showDetail(${Number(item.id_reservasi)})">
                             Detail
                         </button>
                         ${item.status_pembayaran === 'bayar_dp' ? 
-                            `<button class="btn btn-outline-success btn-aksi ms-1" onclick="handleApprove(${item.id_reservasi}, 'Down Payment')">
+                            `<button class="btn btn-outline-success btn-aksi ms-1" onclick="handleApprove(${Number(item.id_reservasi)}, 'Down Payment')">
                                 Setujui
                             </button>` : 
-                            `<button class="btn btn-outline-warning btn-aksi ms-1" onclick="handleChat('${item.no_hp}', ${item.id_reservasi})">
+                            `<button class="btn btn-outline-warning btn-aksi ms-1" onclick="handleChat('${digits(item.no_hp)}', ${Number(item.id_reservasi)})">
                                 Chat
                             </button>`
                         }
-                        <button class="btn btn-outline-danger btn-aksi ms-1" onclick="handleReject(${item.id_reservasi})">
+                        <button class="btn btn-outline-danger btn-aksi ms-1" onclick="handleReject(${Number(item.id_reservasi)})">
                             Tolak
                         </button>
                     </td>
@@ -280,20 +284,20 @@ document.addEventListener("DOMContentLoaded", function() {
         const item = allData.find(d => d.id_reservasi === id);
         if (!item) return;
 
-        const whatsappLink = `https://wa.me/${item.no_hp.replace(/[^0-9]/g, '')}`;
+        const whatsappLink = `https://wa.me/${digits(item.no_hp)}`;
         const statusBadge = getBadgeText(item.status_pembayaran);
         const statusClass = getBadgeClass(item.status_pembayaran);
 
         const content = `
             <div class="row">
                 <div class="col-md-6">
-                    <p><span class="fw-bold">ID Reservasi:</span> #${item.id_reservasi}</p>
-                    <p><span class="fw-bold">Nama Pelanggan:</span> ${item.nama_pelanggan}</p>
-                    <p><span class="fw-bold">No. HP:</span> ${item.no_hp}</p>
+                    <p><span class="fw-bold">ID Reservasi:</span> #${Number(item.id_reservasi)}</p>
+                    <p><span class="fw-bold">Nama Pelanggan:</span> ${esc(item.nama_pelanggan)}</p>
+                    <p><span class="fw-bold">No. HP:</span> ${esc(item.no_hp)}</p>
                 </div>
                 <div class="col-md-6">
-                    <p><span class="fw-bold">Layanan:</span> ${item.nama_layanan} ${item.total_layanan_lain > 0 ? `+${item.total_layanan_lain} lainnya` : ''}</p>
-                    <p><span class="fw-bold">Tanggal:</span> ${item.tanggal_reservasi} ${item.waktu_reservasi}</p>
+                    <p><span class="fw-bold">Layanan:</span> ${esc(item.nama_layanan)} ${item.total_layanan_lain > 0 ? `+${Number(item.total_layanan_lain)} lainnya` : ''}</p>
+                    <p><span class="fw-bold">Tanggal:</span> ${esc(item.tanggal_reservasi)} ${esc(item.waktu_reservasi)}</p>
                     <p><span class="fw-bold">Status Pembayaran:</span> <span class="badge ${statusClass}">${statusBadge}</span></p>
                 </div>
             </div>
@@ -304,8 +308,8 @@ document.addEventListener("DOMContentLoaded", function() {
                     <p><span class="fw-bold">Jumlah Dibayar:</span> Rp ${item.jumlah_dibayar.toLocaleString('id-ID')}</p>
                 </div>
                 <div class="col-md-6">
-                    <p><span class="fw-bold">Tanggal Pembayaran:</span> ${item.tanggal_pembayaran}</p>
-                    <p><span class="fw-bold">Permintaan Pembatalan:</span> ${item.updated_at}</p>
+                    <p><span class="fw-bold">Tanggal Pembayaran:</span> ${esc(item.tanggal_pembayaran)}</p>
+                    <p><span class="fw-bold">Permintaan Pembatalan:</span> ${esc(item.updated_at)}</p>
                 </div>
             </div>
             ${item.catatan !== '-' ? `
@@ -313,7 +317,7 @@ document.addEventListener("DOMContentLoaded", function() {
             <div class="row">
                 <div class="col-12">
                     <p><span class="fw-bold">Catatan:</span></p>
-                    <p>${item.catatan}</p>
+                    <p>${esc(item.catatan)}</p>
                 </div>
             </div>` : ''}
             <hr>

@@ -170,6 +170,9 @@ document.addEventListener("DOMContentLoaded", function() {
     const detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
     const modalDetailContent = document.getElementById('modalDetailContent');
 
+    // Escape data dari user sebelum dimasukin ke innerHTML (anti XSS)
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
     function paginate(arr, p, n){
         const total = arr.length, totalPages = Math.max(1, Math.ceil(total/n));
         const page  = Math.min(Math.max(1,p), totalPages);
@@ -239,13 +242,13 @@ document.addEventListener("DOMContentLoaded", function() {
                 return `
                 <tr>
                     <td>${(idx+1)+((page-1)*state.perPage)}</td>
-                    <td>${nama}</td>
-                    <td>${email}</td>
-                    <td>${phone}</td>
-                    <td><span class="badge-service">${services}</span></td>
-                    <td>${tanggal}</td>
+                    <td>${esc(nama)}</td>
+                    <td>${esc(email)}</td>
+                    <td>${esc(phone)}</td>
+                    <td><span class="badge-service">${esc(services)}</span></td>
+                    <td>${esc(tanggal)}</td>
                     <td>
-                        <button class="btn btn-outline-primary btn-aksi" onclick="showDetail(${item.id})">Detail</button>
+                        <button class="btn btn-outline-primary btn-aksi" onclick="showDetail(${Number(item.id)})">Detail</button>
                     </td>
                 </tr>`;
             }).join('');
@@ -293,27 +296,27 @@ document.addEventListener("DOMContentLoaded", function() {
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="detail-label">Nama Lengkap</div>
-                                <div class="detail-value">${item.name}</div>
+                                <div class="detail-value">${esc(item.name)}</div>
                             </div>
                             <div class="col-md-6">
                                 <div class="detail-label">Email</div>
-                                <div class="detail-value">${item.email}</div>
+                                <div class="detail-value">${esc(item.email)}</div>
                             </div>
                             <div class="col-md-6">
                                 <div class="detail-label">No. Telepon</div>
-                                <div class="detail-value">${item.phone}</div>
+                                <div class="detail-value">${esc(item.phone)}</div>
                             </div>
                             <div class="col-md-6">
                                 <div class="detail-label">Layanan yang Diminati</div>
-                                <div class="detail-value"><span class="badge-service">${item.services}</span></div>
+                                <div class="detail-value"><span class="badge-service">${esc(item.services)}</span></div>
                             </div>
                             <div class="col-12">
                                 <div class="detail-label">Pesan</div>
-                                <div class="detail-value" style="white-space: pre-wrap;">${item.message}</div>
+                                <div class="detail-value" style="white-space: pre-wrap;">${esc(item.message)}</div>
                             </div>
                             <div class="col-12">
                                 <div class="detail-label">Tanggal Dikirim</div>
-                                <div class="detail-value">${formatDate(item.created_at)}</div>
+                                <div class="detail-value">${esc(formatDate(item.created_at))}</div>
                             </div>
                         </div>
                     `;

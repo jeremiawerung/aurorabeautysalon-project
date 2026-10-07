@@ -87,7 +87,7 @@ class KonfirmasiPembatalanController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: '.$e->getMessage(),
+                'message' => 'Terjadi kesalahan: '. . " Silakan coba lagi nanti.",
             ], 500);
         }
     }
@@ -185,7 +185,7 @@ class KonfirmasiPembatalanController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: '.$e->getMessage(),
+                'message' => 'Terjadi kesalahan: '. . " Silakan coba lagi nanti.",
             ], 500);
         }
     }
@@ -234,7 +234,7 @@ class KonfirmasiPembatalanController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: '.$e->getMessage(),
+                'message' => 'Terjadi kesalahan: '. . " Silakan coba lagi nanti.",
             ], 500);
         }
     }

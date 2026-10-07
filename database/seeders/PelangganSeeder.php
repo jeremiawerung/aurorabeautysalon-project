@@ -20,8 +20,10 @@ class PelangganSeeder extends Seeder
             'email' => 'maria.sari@gmail.com',
             'password' => Hash::make('password123'),
             'email_verified_at' => now()->toDateString(),
-            'role' => 'pelanggan',
+            
         ]);
+        $user->role = 'pelanggan';
+        $user->save();
 
         // Create customer in pelanggan table
         Pelanggan::create([

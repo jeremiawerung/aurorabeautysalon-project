@@ -52,9 +52,11 @@ class DummySeeder extends Seeder
                     'name' => 'Super Admin',
                     'email' => $mainAdminEmail,
                     'password' => Hash::make('password'),
-                    'role' => 'admin',
+                    
                     'email_verified_at' => $now,
                 ]);
+        $user->role = 'admin';
+        $user->save();
                 $this->command->info('  - User Admin utama dibuat: '.$mainAdminEmail);
             }
 

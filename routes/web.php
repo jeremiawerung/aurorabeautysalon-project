@@ -40,6 +40,7 @@ Route::middleware(['check.reservasi.status'])->group(function () {
         ->name('galeripelanggan.ajax');
 
     Route::post('/contact/send', [ContactController::class, 'send'])
+        ->middleware('throttle:5,1')
         ->name('contact.send');
 });
 
@@ -62,7 +63,7 @@ Route::get('/layanan/search', [App\Http\Controllers\LayananPelangganController::
 // ------------------------------
 // Auth (tanpa Fortify, versi custom)
 // ------------------------------
-Route::middleware('guest')->group(function () {
+Route::middleware(['guest', 'throttle:6,1'])->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 
@@ -109,6 +110,7 @@ Route::middleware(['auth', 'check.reservasi.status'])->group(function () {
         Route::post('/pembayaran', [BookingController::class, 'step3'])->name('step3');
 
         Route::post('/voucher/validate', [PembayaranController::class, 'validateVoucher'])
+            ->middleware('throttle:10,1')
             ->name('voucher.validate');
 
         Route::post('/midtrans/proses', [PembayaranController::class, 'proses'])->name('midtrans.proses');
@@ -169,7 +171,7 @@ Route::prefix('admin')->middleware(['auth', 'admin', 'check.reservasi.status'])-
 
     // Update password admin
     Route::get('/password/edit', [AdminController::class, 'editPasswordForm'])->name('admin.password.edit');
-    Route::put('/password', [AdminController::class, 'updatePassword'])->name('admin.password.update');
+    Route::put('/password/{id}', [AdminController::class, 'updatePassword'])->name('admin.password.update');
 
     // --------------------------
     // Laporan (VIEW)
@@ -230,9 +232,6 @@ Route::prefix('admin')->middleware(['auth', 'admin', 'check.reservasi.status'])-
 
     // Lain-lain
     Route::resource('/diskon', DiskonController::class);
-    Route::resource('/pilihan-layanan', Pilihan_layananController::class);
-    Route::resource('/reservasi-slot-jadwal', Reservasi_slot_jadwalController::class);
-    Route::resource('/reservasi-layanan', Reservasi_layananController::class);
     Route::resource('/reservasi', ReservasiController::class);
     Route::post('/reservasi/update-status', [ReservasiController::class, 'updateStatus'])->name('reservasi.update_status');
     Route::post('/reservasi/mark-paid', [ReservasiController::class, 'markAsPaid'])->name('reservasi.mark_paid');
@@ -294,21 +293,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin/pos')->name('admin.pos.')->g
 // Route untuk slot jadwal (bisa diakses oleh POS dan booking online)
 Route::get('/booking/slot-jadwal', [PosController::class, 'slotJadwal'])->name('booking.slot_jadwal');
 
-// ------------------------------
-// Pembayaran Midtrans
-// ------------------------------
-Route::controller(PembayaranController::class)->group(function () {
-    // 1. Halaman Checkout/Booking (pindah ke /booking/checkout supaya /booking dipakai kategori)
-    Route::get('/booking/checkout', 'showBookingPage')->name('booking.checkout');
 
-    // 2. Endpoint AJAX untuk Generate Snap Token
-    Route::post('/midtrans/generate-token', 'generateSnapToken')->name('midtrans.generate');
-
-    // 3. Halaman Sukses/Status Redirect (Dipanggil setelah pembayaran di Midtrans)
-
-    // 4. Webhook Notifikasi Midtrans (Rute ini harus PUBLIC)
-    // Route::post('/midtrans/notification', 'notificationHandler')->name('midtrans.notification');
-});
 
 Route::get('/ajax/layanan/pelanggan', [LayananController::class, 'ajaxpelanggan'])->name('layananpelanggan.ajax');
 Route::get('/ajax/kategorilayanan/pelanggan', [KategoriLayananController::class, 'ajaxpelanggan'])->name('kategorilayananpelanggan.ajax');
@@ -317,5 +302,5 @@ Route::get('/ajax/kategorilayanan/pelanggan', [KategoriLayananController::class,
 // Pelanggan area (tanpa prefix)
 // ------------------------------
 Route::middleware(['auth', 'verified', 'pelanggan'])->group(function () {
-    Route::post('/addreservasi', [ReservasiController::class, 'addreservasipelanggan'])->name('reservasi.addreservasipelanggan');
+    
 });

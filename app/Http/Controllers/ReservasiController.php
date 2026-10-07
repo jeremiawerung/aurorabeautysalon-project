@@ -311,7 +311,7 @@ class ReservasiController extends Controller
         } catch (\Exception $e) {
             Log::error('Gagal menyimpan Pengaturan Booking: '.$e->getMessage());
 
-            return response()->json(['error' => 'Terjadi kesalahan: '.$e->getMessage()], 500);
+            return response()->json(['error' => 'Terjadi kesalahan: '. . " Silakan coba lagi nanti."], 500);
         }
     }
 
@@ -767,7 +767,7 @@ class ReservasiController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['success' => false, 'message' => 'Gagal menyimpan: ' . $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Gagal menyimpan: ' .  . " Silakan coba lagi nanti."], 500);
         }
     }
 }
