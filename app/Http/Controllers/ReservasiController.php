@@ -767,7 +767,7 @@ class ReservasiController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['success' => false, 'message' => 'Gagal menyimpan: ' .  . " Silakan coba lagi nanti."], 500);
+            return response()->json(['success' => false, 'message' => 'Gagal menyimpan: ' . " Silakan coba lagi nanti."], 500);
         }
     }
 }

@@ -1465,7 +1465,7 @@ class BookingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil riwayat: ' .  . " Silakan coba lagi nanti.",
+                'message' => 'Terjadi kesalahan saat mengambil riwayat: ' . " Silakan coba lagi nanti.",
             ], 500);
         }
     }

@@ -1731,7 +1731,7 @@ public function validateVoucher(Request $request)
 
         return response()->json([
             'success' => false,
-            'message' => 'Terjadi kesalahan saat memvalidasi voucher: ' .  . " Silakan coba lagi nanti.",
+            'message' => 'Terjadi kesalahan saat memvalidasi voucher: ' . " Silakan coba lagi nanti.",
         ], 500);
     }
 }
