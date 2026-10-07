@@ -64,7 +64,7 @@ class DiskonController extends Controller
             return redirect()->route('diskon.index');
 
         } catch (\Exception $e) {
-            return redirect()->back()->withInput()->with('error', 'Gagal menyimpan diskon: '. . " Silakan coba lagi nanti.");
+            return redirect()->back()->withInput()->with('error', 'Gagal menyimpan diskon: '. " Silakan coba lagi nanti.");
         }
     }
 
@@ -128,7 +128,7 @@ class DiskonController extends Controller
             return redirect()->route('diskon.index');
 
         } catch (\Exception $e) {
-            return redirect()->back()->withInput()->with('error', 'Gagal memperbarui diskon: '. . " Silakan coba lagi nanti.");
+            return redirect()->back()->withInput()->with('error', 'Gagal memperbarui diskon: '. " Silakan coba lagi nanti.");
         }
     }
 
@@ -145,7 +145,7 @@ class DiskonController extends Controller
 
             session()->flash('success', 'Diskon berhasil dihapus!');
         } catch (\Exception $e) {
-            session()->flash('error', 'Gagal menghapus diskon: '. . " Silakan coba lagi nanti.");
+            session()->flash('error', 'Gagal menghapus diskon: '. " Silakan coba lagi nanti.");
         }
 
         return redirect()->route('diskon.index');

@@ -56,7 +56,7 @@ class PosController extends Controller
         } catch (Exception $e) {
             Log::error('PosController@index: '.$e->getMessage());
 
-            return back()->with('error', 'Terjadi kesalahan: '. . " Silakan coba lagi nanti.");
+            return back()->with('error', 'Terjadi kesalahan: '. " Silakan coba lagi nanti.");
         }
     }
 
@@ -245,7 +245,7 @@ class PosController extends Controller
             DB::rollBack();
             Log::error('PosController@save: '.$e->getMessage());
 
-            return response()->json(['success' => false, 'message' => 'Gagal menyimpan booking: '. . " Silakan coba lagi nanti."], 500);
+            return response()->json(['success' => false, 'message' => 'Gagal menyimpan booking: '. " Silakan coba lagi nanti."], 500);
         }
     }
 
@@ -1064,7 +1064,7 @@ class PosController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: '. . " Silakan coba lagi nanti.",
+                'message' => 'Terjadi kesalahan: '. " Silakan coba lagi nanti.",
             ], 500);
         }
     }

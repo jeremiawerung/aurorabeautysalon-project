@@ -287,7 +287,7 @@ class BookingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memproses layanan: '. . " Silakan coba lagi nanti.",
+                'message' => 'Gagal memproses layanan: '. " Silakan coba lagi nanti.",
             ], 500);
         }
     }
@@ -394,7 +394,7 @@ class BookingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memperbarui jadwal. Error: '. . " Silakan coba lagi nanti.",
+                'message' => 'Gagal memperbarui jadwal. Error: '. " Silakan coba lagi nanti.",
             ], 500);
         }
     }
@@ -624,7 +624,7 @@ class BookingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: '. . " Silakan coba lagi nanti.",
+                'message' => 'Terjadi kesalahan: '. " Silakan coba lagi nanti.",
                 
             ], 500);
         }

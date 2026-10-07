@@ -1076,7 +1076,7 @@ class PembayaranController extends Controller
         } catch (\Throwable $e) {
             Log::error('Import pembayaran gagal: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
 
-            return back()->with('error', 'Gagal import pembayaran: '. . " Silakan coba lagi nanti.");
+            return back()->with('error', 'Gagal import pembayaran: '. " Silakan coba lagi nanti.");
         }
     }
 

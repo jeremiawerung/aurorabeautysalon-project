@@ -53,7 +53,7 @@ class PelangganController extends Controller
         } catch (\Throwable $e) {
             Log::error('Import pelanggan gagal: '.$e->getMessage());
 
-            return back()->with('error', 'Gagal import: '. . " Silakan coba lagi nanti.");
+            return back()->with('error', 'Gagal import: '. " Silakan coba lagi nanti.");
         }
     }
 
