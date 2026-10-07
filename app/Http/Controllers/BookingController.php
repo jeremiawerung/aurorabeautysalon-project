@@ -839,7 +839,7 @@ class BookingController extends Controller
                     'id' => $layanan->id_layanan,
                     'title' => $layanan->pivot->nama_layanan_snapshot ?? $layanan->nama_layanan,
                     'price' => $hargaLayanan,
-                    'image' => $layanan->gambar ? asset('storage/layanan/'.$layanan->gambar) : asset('img/favicon.svg'),
+                    'image' => $layanan->gambar ? asset('storage/'.$layanan->gambar) : asset('img/favicon.svg'),
                 ];
             }
 

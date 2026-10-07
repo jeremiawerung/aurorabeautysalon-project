@@ -475,18 +475,25 @@ html, body {
             <div style="font-weight:700;margin-bottom:4px;font-size:14px;">{{ __('booking_step3.payment_method') }}</div>
             <p class="help" style="margin-top:4px;">{{ __('booking_step3.payment_method_desc') }}</p>
 
-            @php $firstMethod = $methods->first(); @endphp
-
-            @if($firstMethod)
+            @foreach($methods as $method)
                 <label class="radio" style="margin-top:10px;flex-basis:100%;justify-content:space-between;">
                     <span>
-                        <input type="radio" name="paymethod" value="{{ $firstMethod->id_metodePembayaran }}" checked>
-                        <span style="font-weight:600;">{{ __('booking_step3.online_payment') }}</span>
-                        <span style="display:block;font-size:12px;color:var(--muted);">{{ __('booking_step3.online_payment_desc') }}</span>
+                        <input type="radio" name="paymethod" value="{{ $method->id_metodePembayaran }}" {{ $loop->first ? 'checked' : '' }} data-istunai="{{ strtolower($method->nama) === 'tunai' ? 'true' : 'false' }}">
+                        <span style="font-weight:600;">{{ $method->nama == 'Midtrans' ? __('booking_step3.online_payment') : $method->nama }}</span>
+                        @if($method->nama == 'Midtrans')
+                            <span style="display:block;font-size:12px;color:var(--muted);">{{ __('booking_step3.online_payment_desc') }}</span>
+                        @else
+                            <span style="display:block;font-size:12px;color:var(--muted);">Bayar langsung di kasir saat perawatan</span>
+                        @endif
                     </span>
-                    <span style="color:var(--muted);font-size:11px;white-space:nowrap;">Midtrans Snap</span>
+                    @if($method->nama == 'Midtrans')
+                        <span style="color:var(--muted);font-size:11px;white-space:nowrap;">Midtrans Snap</span>
+                    @else
+                        <span style="color:var(--muted);font-size:11px;white-space:nowrap;">Tunai / Cash</span>
+                    @endif
                 </label>
-            @else
+            @endforeach
+            @if($methods->isEmpty())
                 <div class="help" style="margin-top:8px;">{{ __('booking_step3.no_payment_method') }}</div>
             @endif
         </div>
@@ -1001,6 +1008,31 @@ document.getElementById('payButton').addEventListener('click', async function() 
         });
 
         const data = await response.json();
+
+        if (data.is_tunai) {
+            loading.style.display = 'flex';
+            loading.innerHTML = 'Menyimpan reservasi Tunai...';
+            const tokenData = data.token;
+            tokenData.amounts = amountsPaid; 
+            tokenData.pay_type_selected = payType;
+            tokenData.metode_id = currentPayMethodId;
+            tokenData.diskon_data = appliedVoucher;
+            
+            const dbResult = await saveToDatabaseMulti({
+                transaction_status: 'pending',
+                payment_type: 'cash'
+            }, tokenData);
+            
+            loading.style.display = 'none';
+            if (dbResult.success) {
+                const idsParam = dbResult.reservasi_ids.join(',');
+                Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Reservasi berhasil disimpan. Silakan bayar di kasir.' })
+                    .then(() => { window.location.href = successUrlMulti.replace(':ids', idsParam); });
+            } else {
+                Swal.fire({ icon: 'error', title: TRANS.saveFailedTitle, text: dbResult.message || TRANS.saveFailedText });
+            }
+            return;
+        }
 
         if (!data.success || !data.token || !data.token.snap_token) {
             Swal.fire({ icon: 'error', title: TRANS.failed, text: data.message || TRANS.failedToken });
