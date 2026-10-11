@@ -580,9 +580,18 @@ class PembayaranController extends Controller
         Config::$serverKey = config('midtrans.serverKey');
         Config::$isProduction = config('midtrans.isProduction', false);
 
+        // 2. Terima Notifikasi. SDK Midtrans ngecek ulang status order ke API Midtrans.
+        // Kalau ordernya gak dikenal (mis. tombol "Test notification URL" di dashboard), cukup dibalas 200
+        // biar Midtrans gak ngirim ulang terus. Gak ada data yang diproses.
         try {
-            // 2. Terima Notifikasi
             $notification = new Notification;
+        } catch (\Throwable $e) {
+            Log::warning('Midtrans Notification: transaksi tidak bisa diverifikasi, diabaikan.', ['error' => $e->getMessage()]);
+
+            return response('OK (diabaikan)', 200);
+        }
+
+        try {
             $orderId = $notification->order_id; // Order ID TUNGGAL dari Midtrans
             $transactionStatus = $notification->transaction_status;
             $fraudStatus = $notification->fraud_status;
@@ -613,7 +622,8 @@ class PembayaranController extends Controller
             if ($payments->isEmpty()) {
                 Log::warning("Midtrans Notification: Order ID (order_id) {$orderId} tidak ditemukan.");
 
-                return response('Order ID not found', 404);
+                // 200 biar Midtrans gak retry terus untuk order yang bukan dari checkout pelanggan
+                return response('OK (order tidak dikenal)', 200);
             }
 
             DB::beginTransaction();
