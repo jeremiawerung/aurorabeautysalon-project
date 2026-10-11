@@ -261,6 +261,15 @@
                 </div>
             @endif
 
+            @if (session('email_unverified'))
+                <form method="POST" action="{{ route('verification.resend.guest') }}" class="mb-3">
+                    @csrf
+                    <input type="hidden" name="email" value="{{ session('email_unverified') }}">
+                    <span class="small text-muted">Belum menerima email verifikasi?</span>
+                    <button type="submit" class="btn btn-link btn-sm p-0 align-baseline">Kirim ulang email verifikasi</button>
+                </form>
+            @endif
+
             <!-- Login Form -->
             <form method="POST" action="{{ route('login.post') }}">
                 @csrf

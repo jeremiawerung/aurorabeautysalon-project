@@ -721,6 +721,9 @@ const TRANS = {
     successRemoved: "{{ __('layanan.success_removed') }}",
     errorLoadCart: "{{ __('layanan.error_load_cart') }}",
     errorAddCart: "{{ __('layanan.error_add_cart') }}",
+    loginRequiredTitle: "{{ __('layanan.login_required_title') }}",
+    loginRequiredText: "{{ __('layanan.login_required_text') }}",
+    loginButton: "{{ __('layanan.login_button') }}",
     errorRemoveCart: "{{ __('layanan.error_remove_cart') }}",
     errorOccurred: "{{ __('layanan.error_occurred') }}",
     confirmRemoveTitle: "{{ __('layanan.confirm_remove_title') }}",
@@ -751,9 +754,11 @@ async function loadCart() {
                 'Accept': 'application/json'
             }
         });
-        
+
+        if (response.status === 401) return; // tamu belum punya keranjang
+
         const result = await response.json();
-        
+
         if (result.success && result.cart) {
             cartData = result.cart;
             renderCart();
@@ -789,6 +794,18 @@ async function addToCart(idLayanan) {
                 action: 'add'
             })
         });
+
+        // Tamu (belum login): arahkan ke halaman login, jangan tampilkan pesan teknis "Unauthenticated."
+        if (response.status === 401) {
+            await Swal.fire({
+                icon: 'info',
+                title: TRANS.loginRequiredTitle,
+                text: TRANS.loginRequiredText,
+                confirmButtonText: TRANS.loginButton,
+            });
+            window.location.href = '{{ route("login") }}';
+            return;
+        }
 
         const result = await response.json();
 

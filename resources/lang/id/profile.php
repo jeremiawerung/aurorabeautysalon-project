@@ -19,6 +19,7 @@ return [
     // Change Password Card
     'change_password' => 'Ubah Password',
     'change_password_desc' => 'Gunakan password yang kuat dan jangan bagikan kepada siapa pun.',
+    'current_password' => 'Password Lama',
     'new_password' => 'Password Baru',
     'confirm_new_password' => 'Konfirmasi Password Baru',
     'save_password' => 'Simpan Password',

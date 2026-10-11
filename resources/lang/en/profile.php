@@ -19,6 +19,7 @@ return [
     // Change Password Card
     'change_password' => 'Change Password',
     'change_password_desc' => 'Use a strong password and do not share it with anyone.',
+    'current_password' => 'Current Password',
     'new_password' => 'New Password',
     'confirm_new_password' => 'Confirm New Password',
     'save_password' => 'Save Password',

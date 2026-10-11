@@ -31,14 +31,14 @@ return [
         'img_alt' => 'Tim Aurora Salon',
         'label' => 'TENTANG KAMI',
         'title' => 'Aurora menjadi penghubung terpercaya antara layanan kecantikan profesional dan para pelanggan setia.',
-        'desc' => 'Aurora Beauty Salon berkomitmen memberikan pelayanan terbaik dan nyaman bagi masyarakat Kecamatan Cidadap. Kami memudahkan akses layanan kecantikan dari satu tempat yang terintegrasi dan ramah, sehingga pelanggan dapat menikmati beragam layanan berkualitas dengan mudah dan terjangkau.',
+        'desc' => 'Aurora Beauty Salon berkomitmen memberikan pelayanan terbaik dan nyaman bagi masyarakat Kota Kotamobagu. Kami memudahkan akses layanan kecantikan dari satu tempat yang terintegrasi dan ramah, sehingga pelanggan dapat menikmati beragam layanan berkualitas dengan mudah dan terjangkau.',
     ],
 
     'journey' => [
         'img_alt' => 'Perjalanan Aurora',
         'label' => 'Kenapa Harus Kami?',
         'title' => 'Awal Perjalanan Kami',
-        'desc' => 'Aurora Beauty Salon hadir sebagai respons atas tantangan industri layanan kecantikan di Kecamatan Cidadap: banyak pilihan, tetapi sulit menemukan yang tepat dan terpercaya. Kami mengintegrasikan layanan dalam satu tempat agar pelanggan lebih mudah menemukan dan mendapatkan layanan sesuai kebutuhan tanpa berpindah-pindah.',
+        'desc' => 'Aurora Beauty Salon hadir sebagai respons atas tantangan industri layanan kecantikan di Kota Kotamobagu: banyak pilihan, tetapi sulit menemukan yang tepat dan terpercaya. Kami mengintegrasikan layanan dalam satu tempat agar pelanggan lebih mudah menemukan dan mendapatkan layanan sesuai kebutuhan tanpa berpindah-pindah.',
         'items' => [
             'vision' => [
                 'title' => 'Visi',

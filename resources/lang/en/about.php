@@ -31,7 +31,7 @@ return [
         'img_alt' => 'Aurora Salon Team',
         'label' => 'ABOUT US',
         'title' => 'Aurora is a trusted bridge between professional beauty services and our loyal customers.',
-        'desc' => 'Aurora Beauty Salon is committed to providing the best and most comfortable service for the Cidadap community. We make access to beauty services easier in a single, friendly, integrated place so customers can enjoy quality services conveniently and affordably.',
+        'desc' => 'Aurora Beauty Salon is committed to providing the best and most comfortable service for the Kotamobagu community. We make access to beauty services easier in a single, friendly, integrated place so customers can enjoy quality services conveniently and affordably.',
     ],
 
     'journey' => [

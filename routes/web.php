@@ -86,6 +86,10 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('throttle:6,1')->name('verification.send');
 });
 
+// Kirim ulang verifikasi dari halaman login (akun belum verifikasi gak bisa login)
+Route::post('/email/kirim-ulang-verifikasi', [EmailVerificationController::class, 'resendGuest'])
+    ->middleware(['guest', 'throttle:3,1'])->name('verification.resend.guest');
+
 Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
     ->middleware('signed')
     ->name('verification.verify');

@@ -133,6 +133,25 @@ class EmailVerificationController extends Controller
         return back()->with('resent', 'Link verifikasi telah dikirim ulang ke email Anda!');
     }
 
+    /**
+     * Kirim ulang email verifikasi dari halaman login (tanpa login).
+     *
+     * Akun yang belum verifikasi di-logout pas login, jadi gak bisa buka resend() di atas.
+     * Pesannya sengaja selalu sama biar orang gak bisa ngecek email mana yang terdaftar.
+     */
+    public function resendGuest(Request $request)
+    {
+        $data = $request->validate(['email' => 'required|email|max:255']);
+
+        $user = \App\Models\User::where('email', $data['email'])->first();
+        if ($user && ! $user->hasVerifiedEmail()) {
+            $user->sendEmailVerificationNotification();
+        }
+
+        return redirect()->route('login')->with('status',
+            'Jika email terdaftar dan belum terverifikasi, link verifikasi baru sudah dikirim. Silakan cek email Anda (termasuk folder Spam).');
+    }
+
     protected function redirectPath()
     {
         $user = Auth::user();

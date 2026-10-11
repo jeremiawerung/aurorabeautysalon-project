@@ -53,7 +53,7 @@
                 <div>
                     <h3 class="category-title">{{ $cat->nama }}</h3>
                     <div class="category-meta">
-                        {!! __('categories.meta.services_html', ['count' => '<strong>'.($cat->layanan->count() ?? 0).'</strong>']) !!}
+                        {!! __('categories.meta.services_html', ['count' => '<strong>'.($cat->layanan_count ?? 0).'</strong>']) !!}
                     </div>
                     @if(!empty($cat->keterangan))
                         <div style="color:#666;font-size:14px;line-height:1.5">

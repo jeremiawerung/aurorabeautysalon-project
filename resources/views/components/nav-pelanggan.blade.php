@@ -83,6 +83,7 @@
                         <i class="fas fa-phone"></i>
                         <span>{{ __('nav.contact') }}</span>
                     </a>
+                    @include('components.partials.mobile-lang-switch')
                 </div>
 
                 <div class="profile-divider"></div>
@@ -118,6 +119,7 @@
                     <i class="fas fa-phone"></i>
                     <span>{{ __('nav.contact') }}</span>
                 </a>
+                @include('components.partials.mobile-lang-switch')
 
                 <div class="profile-divider"></div>
 

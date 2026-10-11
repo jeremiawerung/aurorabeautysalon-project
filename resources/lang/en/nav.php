@@ -10,6 +10,7 @@ return [
     'cart' => 'Booking Cart',
     'logout' => 'Sign Out',
     'menu' => 'Menu',
+    'language' => 'Language',
     'sign_in' => 'Sign In',
     'sign_up' => 'Sign Up',
     'discount' => 'Discount voucher ',

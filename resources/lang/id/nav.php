@@ -10,6 +10,7 @@ return [
     'cart' => 'Keranjang Booking',
     'logout' => 'Keluar',
     'menu' => 'Menu',
+    'language' => 'Bahasa',
     'sign_in' => 'Masuk',
     'sign_up' => 'Daftar',
     'discount' => 'Kupon Diskon',

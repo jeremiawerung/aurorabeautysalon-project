@@ -604,6 +604,12 @@ class PembayaranController extends Controller
             // 4. Ambil SEMUA pembayaran yang terkait dengan order_id TUNGGAL ini
             $payments = Pembayaran::where('order_id', 'LIKE', $orderId.'-%')->get();
 
+            if ($payments->isEmpty() && $midtransStatus !== 'failed') {
+                // Baris pembayaran biasanya dibikin callback JS. Kalau pelanggan nutup browser duluan
+                // (mis. bayar QRIS dari HP), callback gak jalan, jadi dibikin dari rincian order di cache.
+                $payments = $this->buatPembayaranDariCache($orderId, $notification);
+            }
+
             if ($payments->isEmpty()) {
                 Log::warning("Midtrans Notification: Order ID (order_id) {$orderId} tidak ditemukan.");
 
@@ -728,6 +734,50 @@ class PembayaranController extends Controller
             return response('Server Error', 500);
         }
     }
+    /**
+     * Bikin baris pembayaran (status pending) dari rincian order yang disimpan proses().
+     * Status akhirnya (bayar_dp / bayar_lunas) tetap ditentukan notificationHandler.
+     */
+    private function buatPembayaranDariCache(string $orderId, $notification)
+    {
+        $order = Cache::get(self::ORDER_CACHE_PREFIX.$orderId);
+        if (! $order) {
+            return collect();
+        }
+
+        // Nominal dari Midtrans harus sama dengan hitungan server waktu checkout
+        if (abs((float) ($notification->gross_amount ?? 0) - (float) $order['total']) > 1) {
+            Log::warning('Midtrans Notification: nominal tidak cocok', [
+                'order_id' => $orderId,
+                'midtrans' => $notification->gross_amount ?? null,
+                'server' => $order['total'],
+            ]);
+
+            return collect();
+        }
+
+        foreach ($order['items'] as $item) {
+            if ((float) $item['amount'] <= 0) {
+                continue;
+            }
+
+            Pembayaran::firstOrCreate(
+                ['order_id' => $orderId.'-'.$item['reservasi_id'], 'id_reservasi' => $item['reservasi_id']],
+                [
+                    'id_metodePembayaran' => $order['metode_id'],
+                    'tanggal_pembayaran' => null,
+                    'jumlah' => $item['amount'],
+                    'diskon_applied' => $item['diskon_amount'],
+                    'metode' => $notification->payment_type ?? 'unknown',
+                    'status_pembayaran' => 'pending',
+                    'pay_type_selected' => $order['pay_type'],
+                ]
+            );
+        }
+
+        return Pembayaran::where('order_id', 'LIKE', $orderId.'-%')->get();
+    }
+
     // ====== Helpers dan Metode Laporan (Metode pendukung lain) ======
 
     /**

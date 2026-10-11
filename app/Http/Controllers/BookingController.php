@@ -498,6 +498,9 @@ class BookingController extends Controller
 
             $jadwalBukaJson = $this->parseHariOperasionalJson($tentangKami->hari_operasional);
 
+            // Durasi layanan dipakai biar slot yang selesainya lewat jam tutup gak ditawarin
+            $durasiLayanan = (int) DB::table('layanan')->where('id_layanan', $idLayanan)->value('durasi');
+
             $tanggalMulai = $now->copy()->toDateString();
             $tanggalSelesai = $now->copy()->addDays($maksRentangBooking - 1)->toDateString();
 
@@ -560,9 +563,10 @@ class BookingController extends Controller
 
                     $slotDateTime = Carbon::parse($tanggalCekStr.' '.$slotTime, 'Asia/Jakarta');
 
-                    // Cek Batas Jam Operasional
+                    // Cek Batas Jam Operasional: mulai gak boleh sebelum buka, selesai gak boleh lewat jam tutup
                     $slotTimeCarbon = Carbon::parse($slotTime);
-                    if ($slotTimeCarbon->lt($jamMulaiHariIni) || $slotTimeCarbon->gt($jamSelesaiHariIni)) {
+                    if ($slotTimeCarbon->lt($jamMulaiHariIni)
+                        || $slotTimeCarbon->copy()->addMinutes($durasiLayanan)->gt($jamSelesaiHariIni)) {
                         continue;
                     }
 
@@ -636,7 +640,8 @@ class BookingController extends Controller
 
     public function chooseCategory()
     {
-        $categories = KategoriLayanan::withCount('layanan')->get();
+        // Hitung layanan aktif saja, sama seperti yang ditampilkan di step1
+        $categories = KategoriLayanan::withCount(['layanan' => fn ($q) => $q->where('status_layanan', 'aktif')])->get();
 
         return view('pelanggan.booking-pilih-kategori-layanan', compact('categories'));
     }
@@ -1579,7 +1584,7 @@ class BookingController extends Controller
                     $class = 'pending';
                     $text = 'Dijadwalkan (DP)';
                     $hint = 'Menunggu waktu layanan. Sisa pembayaran diperlukan.';
-                    $showCancel = true; // BISA CANCEL
+                    $showCancel = false; // Sesuai kebijakan: reservasi yang baru DP tidak bisa dibatalkan
                 } else {
                     $class = 'proses';
                     $text = 'Menunggu Penyelesaian';
@@ -1648,6 +1653,17 @@ class BookingController extends Controller
                 'success' => false,
                 'message' => 'Reservasi tidak dapat dibatalkan atau tidak ditemukan.',
             ], 404); // 404 Not Found
+        }
+
+        // Kebijakan: reservasi yang baru dibayar DP (belum lunas) tidak bisa dibatalkan.
+        // Dicek di server juga, karena tombol yang disembunyikan di tampilan bukan pengamanan.
+        $sudahLunas = $reservasi->pembayaran()->where('status_pembayaran', 'bayar_lunas')->exists();
+        $sudahDp = $reservasi->pembayaran()->where('status_pembayaran', 'bayar_dp')->exists();
+        if ($sudahDp && ! $sudahLunas) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Reservasi yang sudah dibayar DP tidak dapat dibatalkan.',
+            ], 422);
         }
 
         // Jika user klik batal -> menunggu_konfirmasi_pembatalan
