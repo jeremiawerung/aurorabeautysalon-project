@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
-use App\Notifications\QueuedVerifyEmail;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Log;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasProfilePhoto;
 use Laravel\Sanctum\HasApiTokens;
@@ -94,14 +95,22 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Override notifikasi verifikasi email bawaan supaya dikirim lewat queue.
+     * Email verifikasi dikirim LANGSUNG (sinkron), sama kayak email reset password.
      *
-     * Tanpa ini, notifikasi VerifyEmail default Laravel dikirim SINKRON (SMTP asli ke Gmail,
-     * lihat .env MAIL_MAILER=smtp) di tengah request registrasi, membuat halaman tergantung
-     * beberapa detik sebelum redirect. QueuedVerifyEmail identik tapi ShouldQueue.
+     * Dulu lewat queue (QueuedVerifyEmail), tapi di hosting cPanel gak ada queue worker,
+     * jadi emailnya nyangkut di tabel jobs dan gak pernah kekirim. Sengaja gak pakai cron
+     * queue:work karena satu akun hosting dipakai bareng beberapa domain.
+     * Konsekuensinya halaman daftar nunggu beberapa detik selama kirim ke SMTP Gmail.
+     *
+     * Kalau SMTP gagal, error-nya cuma dicatat ke log biar registrasi tetep lanjut ke
+     * halaman verifikasi (di sana ada tombol Kirim Ulang).
      */
     public function sendEmailVerificationNotification()
     {
-        $this->notify(new QueuedVerifyEmail);
+        try {
+            $this->notify(new VerifyEmail);
+        } catch (\Throwable $e) {
+            Log::error('Gagal kirim email verifikasi', ['user_id' => $this->id, 'error' => $e->getMessage()]);
+        }
     }
 }
