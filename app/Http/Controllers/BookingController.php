@@ -12,6 +12,7 @@ use App\Models\Pembayaran;
 use App\Models\Reservasi;
 use App\Models\User;
 use App\Notifications\AdminNotification;
+use App\Support\SlotReservasi;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
@@ -424,33 +425,9 @@ class BookingController extends Controller
             return false; // Slot tidak ada untuk layanan ini pada waktu tersebut
         }
 
-        // 2. Cek apakah ada reservasi lain yang sudah menggunakan slot ini
-        $reservasiCount = DB::table('reservasi')
-            ->join('reservasi_layanan', 'reservasi.id_reservasi', '=', 'reservasi_layanan.id_reservasi')
-        // Memperbaiki Ambiguity Kolom:
-            ->where('reservasi.tanggal_reservasi', $tanggal)
-            ->where('reservasi.waktu_reservasi', $waktu_h_i_s)
-
-        // Perbaikan di sini: Tambahkan prefix 'reservasi.'
-            ->where('reservasi.id_reservasi', '!=', $ignoreReservasiId)
-
-            ->whereIn('reservasi.status_reservasi', ['sudah dibayar', 'proses'])
-            ->orWhere(function($q) use ($tanggal, $waktu_h_i_s, $ignoreReservasiId, $idLayanan) {
-                $q->where('reservasi.tanggal_reservasi', $tanggal)
-                  ->where('reservasi.waktu_reservasi', $waktu_h_i_s)
-                  ->where('reservasi.id_reservasi', '!=', $ignoreReservasiId)
-                  ->where('reservasi.status_reservasi', 'pending')
-                  ->whereExists(function ($query) {
-                      $query->select(DB::raw(1))
-                            ->from('pembayaran')
-                            ->whereColumn('pembayaran.id_reservasi', 'reservasi.id_reservasi');
-                  });
-            })
-            ->where('reservasi_layanan.id_layanan', $idLayanan)
-            ->lockForUpdate()
-            ->count();
-
-        return $reservasiCount === 0;
+        // 2. Cek apakah ada reservasi lain yang udah bayar / lagi bayar slot ini.
+        // Baris slot_jadwal udah dikunci sama pemanggil, jadi cek ini gak bisa balapan.
+        return ! SlotReservasi::bentrok((int) $idLayanan, (string) $tanggal, $waktu_h_i_s, $ignoreReservasiId ? (int) $ignoreReservasiId : null);
     }
 
     public function getRentangSlotDinamis(Request $request)
@@ -1135,8 +1112,9 @@ class BookingController extends Controller
         $latestPayment = $firstReservasi->pembayaran()->latest()->first();
 
         if (! $latestPayment) {
-            // Jika tidak ada pembayaran, kemungkinan status pending/dibatalkan
-            return redirect()->route('home')->with('error', 'Tidak ada riwayat pembayaran yang ditemukan untuk transaksi ini.');
+            // Belum ada pembayaran: biasanya pembayaran masih ditunggu (mis. QRIS belum discan).
+            // Pembayaran baru dicatat pas Midtrans bilang lunas, jadi arahin ke riwayat booking.
+            return redirect()->route('booking.history')->with('info', 'Pembayaran sedang menunggu konfirmasi. Status reservasi berubah otomatis setelah pembayaran diterima.');
         }
 
         // Ambil SEMUA pembayaran yang merupakan bagian dari transaksi Midtrans TUNGGAL ini

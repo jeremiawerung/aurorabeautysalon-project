@@ -589,6 +589,8 @@ class PosController extends Controller
                         ->where('waktu_reservasi', $reservasi->waktu_reservasi)
                         ->where('status_reservasi', 'pending')
                         ->whereDoesntHave('pembayaran')
+                        // Jangan hapus reservasi pelanggan yang slotnya lagi ditahan (lagi bayar online)
+                        ->where(fn ($q) => $q->whereNull('ditahan_sampai')->orWhere('ditahan_sampai', '<=', now()))
                         ->whereHas('layanan', function($q) use ($reservasi) {
                             $q->whereIn('layanan.id_layanan', $reservasi->layanan->pluck('id_layanan'));
                         })
@@ -847,6 +849,8 @@ class PosController extends Controller
                         ->where('waktu_reservasi', $reservasi->waktu_reservasi)
                         ->where('status_reservasi', 'pending')
                         ->whereDoesntHave('pembayaran')
+                        // Jangan hapus reservasi pelanggan yang slotnya lagi ditahan (lagi bayar online)
+                        ->where(fn ($q) => $q->whereNull('ditahan_sampai')->orWhere('ditahan_sampai', '<=', now()))
                         ->whereHas('layanan', function($q) use ($reservasi) {
                             $q->whereIn('layanan.id_layanan', $reservasi->layanan->pluck('id_layanan'));
                         })

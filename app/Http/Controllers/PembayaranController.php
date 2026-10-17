@@ -12,8 +12,10 @@ use App\Models\Layanan;
 use App\Models\MetodePembayaran;
 use App\Models\Pembayaran;
 use App\Models\Reservasi;
+use App\Support\SlotReservasi;
 use Barryvdh\DomPDF\Facade\Pdf as PDF;
 use Carbon\Carbon;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -148,15 +150,28 @@ class PembayaranController extends Controller
             }])
                 ->whereIn('id_reservasi', $reservasiIds)
                 ->where('id_pelanggan', $idPelanggan)
+                // Reservasi yang udah batal / nunggu konfirmasi batal gak boleh dibayar (dan gak boleh balik ke pending)
+                ->whereIn('status_reservasi', ['diproses', 'pending'])
                 ->get();
 
             if ($reservasiModels->count() !== count($reservasiIds)) {
-                Log::warning('Midtrans proses: ada reservasi yang bukan milik pelanggan', [
+                Log::warning('Midtrans proses: ada reservasi yang bukan milik pelanggan atau statusnya gak bisa dibayar', [
                     'user_id' => auth()->id(),
                     'reservasi_ids' => $reservasiIds,
                 ]);
 
-                return response()->json(['success' => false, 'message' => 'Reservasi tidak ditemukan.'], 404);
+                return response()->json(['success' => false, 'message' => 'Reservasi tidak ditemukan atau sudah tidak bisa dibayar.'], 404);
+            }
+
+            // Tahan slot dulu sebelum bikin order Midtrans, biar 2 pelanggan gak bisa bayar slot yang sama
+            $reservasiBentrok = SlotReservasi::tahanUntukCheckout($reservasiModels);
+            if ($reservasiBentrok) {
+                $jadwal = $reservasiBentrok->tanggal_reservasi->format('d/m/Y').' jam '.substr($reservasiBentrok->waktu_reservasi, 0, 5);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => "Slot {$jadwal} baru saja diambil pelanggan lain. Silakan pilih jadwal lain.",
+                ], 409);
             }
 
             foreach ($reservasiModels as $reservasi) {
@@ -256,6 +271,11 @@ class PembayaranController extends Controller
                 ],
                 'customer_details' => $customerDetails,
                 'item_details' => $itemDetails,
+                // Batas bayar, harus lebih pendek dari lama slot ditahan
+                'expiry' => [
+                    'unit' => 'minutes',
+                    'duration' => SlotReservasi::MENIT_BAYAR,
+                ],
                 // Gunakan custom_field1 untuk menyimpan tipe pembayaran yang dipilih klien
                 'custom_field1' => json_encode([
                     'pay_type_selected' => $payType,
@@ -403,9 +423,26 @@ class PembayaranController extends Controller
         $payTypeSelected = $order['pay_type'];
         $orderItems = collect($order['items'])->keyBy('reservasi_id');
 
+        // Belum dibayar (mis. QRIS belum discan): gak ada yang dicatat. Pembayaran baru dicatat
+        // pas Midtrans bilang lunas, lewat callback ini atau webhook. Slot tetep ditahan dari proses().
+        if ($midtransStatus === 'pending') {
+            return response()->json([
+                'success' => true,
+                'reservasi_ids' => $orderItems->keys()->map(fn ($rid) => (int) $rid)->values()->all(),
+                'status' => $midtransStatus,
+                'message' => 'Menunggu pembayaran.',
+            ]);
+        }
+
         DB::beginTransaction();
         try {
             $updatedReservasiIds = [];
+
+            // Kunci reservasinya dulu biar callback ini sama webhook Midtrans gak nyatet barengan
+            Reservasi::whereIn('id_reservasi', $orderItems->keys()->map(fn ($rid) => (int) $rid))
+                ->orderBy('id_reservasi')
+                ->lockForUpdate()
+                ->get();
 
             // 3. Loop untuk setiap Reservasi yang terlibat (data dari server, bukan dari browser)
             foreach ($orderItems as $rid => $item) {
@@ -515,6 +552,7 @@ class PembayaranController extends Controller
                         ->where('waktu_reservasi', $reservasi->waktu_reservasi)
                         ->where('status_reservasi', 'pending')
                         ->whereDoesntHave('pembayaran')
+                        ->where(fn ($q) => $q->whereNull('ditahan_sampai')->orWhere('ditahan_sampai', '<=', now()))
                         ->whereHas('layanan', function($q) use ($reservasi) {
                             $q->whereIn('layanan.id_layanan', $reservasi->layanan->pluck('id_layanan'));
                         })
@@ -560,6 +598,17 @@ class PembayaranController extends Controller
 
 
 
+        } catch (UniqueConstraintViolationException $e) {
+            // Webhook Midtrans udah nyatet pembayaran yang sama duluan
+            DB::rollBack();
+            Log::info('Midtrans Callback: pembayaran sudah tercatat (order_id dobel), dilewati.', ['order_id' => $orderId]);
+
+            return response()->json([
+                'success' => true,
+                'reservasi_ids' => $orderItems->keys()->map(fn ($rid) => (int) $rid)->values()->all(),
+                'status' => $midtransStatus,
+                'message' => 'Data pembayaran telah disimpan.',
+            ]);
         } catch (\Throwable $e) {
             DB::rollBack();
             Log::error('Midtrans Callback DB Error (Multi): '.$e->getMessage());
@@ -610,23 +659,38 @@ class PembayaranController extends Controller
                 return response('Status not processed: '.$transactionStatus, 200);
             }
 
-            // 4. Ambil SEMUA pembayaran yang terkait dengan order_id TUNGGAL ini
+            DB::beginTransaction();
+
+            // Kunci reservasi yang terlibat biar webhook ini sama callback browser gak nyatet barengan
+            $orderCache = Cache::get(self::ORDER_CACHE_PREFIX.$orderId);
+            $ridTerkait = collect($orderCache['items'] ?? [])->pluck('reservasi_id')
+                ->merge(Pembayaran::where('order_id', 'LIKE', $orderId.'-%')->pluck('id_reservasi'))
+                ->filter()
+                ->map(fn ($rid) => (int) $rid)
+                ->unique()
+                ->sort()
+                ->values();
+
+            if ($ridTerkait->isNotEmpty()) {
+                Reservasi::whereIn('id_reservasi', $ridTerkait)->orderBy('id_reservasi')->lockForUpdate()->get();
+            }
+
+            // 4. Ambil SEMUA pembayaran yang terkait dengan order_id TUNGGAL ini (dibaca ulang setelah dikunci)
             $payments = Pembayaran::where('order_id', 'LIKE', $orderId.'-%')->get();
 
-            if ($payments->isEmpty() && $midtransStatus !== 'failed') {
+            if ($payments->isEmpty() && $midtransStatus === 'paid') {
                 // Baris pembayaran biasanya dibikin callback JS. Kalau pelanggan nutup browser duluan
                 // (mis. bayar QRIS dari HP), callback gak jalan, jadi dibikin dari rincian order di cache.
                 $payments = $this->buatPembayaranDariCache($orderId, $notification);
             }
 
             if ($payments->isEmpty()) {
+                DB::rollBack();
                 Log::warning("Midtrans Notification: Order ID (order_id) {$orderId} tidak ditemukan.");
 
                 // 200 biar Midtrans gak retry terus untuk order yang bukan dari checkout pelanggan
                 return response('OK (order tidak dikenal)', 200);
             }
-
-            DB::beginTransaction();
 
             foreach ($payments as $pembayaran) {
                 $oldStatus = $pembayaran->status_pembayaran;
@@ -685,6 +749,7 @@ class PembayaranController extends Controller
                             ->where('waktu_reservasi', $reservasi->waktu_reservasi)
                             ->where('status_reservasi', 'pending')
                             ->whereDoesntHave('pembayaran')
+                            ->where(fn ($q) => $q->whereNull('ditahan_sampai')->orWhere('ditahan_sampai', '<=', now()))
                             ->whereHas('layanan', function($q) use ($reservasi) {
                                 $q->whereIn('layanan.id_layanan', $reservasi->layanan->pluck('id_layanan'));
                             })
@@ -737,6 +802,12 @@ class PembayaranController extends Controller
             return response('OK', 200);
 
 
+        } catch (UniqueConstraintViolationException $e) {
+            // Callback browser udah nyatet pembayaran yang sama duluan
+            DB::rollBack();
+            Log::info('Midtrans Notification: pembayaran sudah tercatat (order_id dobel), dilewati.', ['order_id' => $orderId ?? null]);
+
+            return response('OK (sudah diproses)', 200);
         } catch (\Throwable $e) {
             DB::rollBack();
             Log::error('Midtrans notification handler error (Multi): '.$e->getMessage());
@@ -746,6 +817,7 @@ class PembayaranController extends Controller
     }
     /**
      * Bikin baris pembayaran (status pending) dari rincian order yang disimpan proses().
+     * Cuma dipanggil pas Midtrans bilang lunas, di dalam transaksi notificationHandler.
      * Status akhirnya (bayar_dp / bayar_lunas) tetap ditentukan notificationHandler.
      */
     private function buatPembayaranDariCache(string $orderId, $notification)
@@ -775,7 +847,8 @@ class PembayaranController extends Controller
                 ['order_id' => $orderId.'-'.$item['reservasi_id'], 'id_reservasi' => $item['reservasi_id']],
                 [
                     'id_metodePembayaran' => $order['metode_id'],
-                    'tanggal_pembayaran' => null,
+                    // Kolom ini wajib diisi di database, nanti ditimpa jam lunas sama notificationHandler
+                    'tanggal_pembayaran' => now(),
                     'jumlah' => $item['amount'],
                     'diskon_applied' => $item['diskon_amount'],
                     'metode' => $notification->payment_type ?? 'unknown',

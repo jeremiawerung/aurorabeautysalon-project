@@ -17,6 +17,7 @@ class Reservasi extends Model
 
     protected $casts = [
         'tanggal_reservasi' => 'date',
+        'ditahan_sampai' => 'datetime',
         'total_harga' => 'decimal:2',
         'catatan' => 'array',
     ];
